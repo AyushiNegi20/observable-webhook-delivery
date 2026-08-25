@@ -1,0 +1,121 @@
+import { randomUUID } from "node:crypto";
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+
+import type { DeliveryClient, WebhookEvent } from "./delivery.js";
+
+interface EventRequestBody {
+  eventType: string;
+  data: Record<string, unknown>;
+}
+
+interface BuildAppOptions {
+  deliveryClient: DeliveryClient;
+  logger?: boolean | FastifyBaseLogger;
+}
+
+const eventBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["eventType", "data"],
+  properties: {
+    eventType: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+    },
+    data: {
+      type: "object",
+      additionalProperties: true,
+    },
+  },
+} as const;
+
+const webhookEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "eventType", "data", "createdAt"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    eventType: { type: "string" },
+    data: { type: "object", additionalProperties: true },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export function buildApp(options: BuildAppOptions): FastifyInstance {
+  const app = Fastify({
+    logger: options.logger ?? true,
+  });
+
+  app.get("/health", async () => ({ status: "ok" }));
+
+  app.post<{ Body: WebhookEvent }>(
+    "/mock/webhooks",
+    {
+      schema: {
+        body: webhookEventSchema,
+      },
+    },
+    async (request) => {
+      request.log.info(
+        {
+          eventId: request.body.id,
+          eventType: request.body.eventType,
+        },
+        "Mock receiver accepted webhook",
+      );
+
+      return { received: true };
+    },
+  );
+
+  app.post<{ Body: EventRequestBody }>(
+    "/events",
+    {
+      schema: {
+        body: eventBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const event: WebhookEvent = {
+        id: randomUUID(),
+        eventType: request.body.eventType,
+        data: request.body.data,
+        createdAt: new Date().toISOString(),
+      };
+
+      request.log.info(
+        { eventId: event.id, eventType: event.eventType },
+        "Webhook delivery started",
+      );
+
+      try {
+        await options.deliveryClient.deliver(event);
+      } catch (error) {
+        request.log.error(
+          { err: error, eventId: event.id, eventType: event.eventType },
+          "Webhook delivery failed",
+        );
+
+        return reply.code(502).send({
+          eventId: event.id,
+          status: "failed",
+          error: "Webhook delivery failed",
+        });
+      }
+
+      request.log.info(
+        { eventId: event.id, eventType: event.eventType },
+        "Webhook delivery completed",
+      );
+
+      return reply.code(201).send({
+        eventId: event.id,
+        status: "delivered",
+      });
+    },
+  );
+
+  return app;
+}
