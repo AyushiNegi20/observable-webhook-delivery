@@ -108,4 +108,28 @@ describe("webhook delivery API", () => {
 
     await app.close();
   });
+
+  it("can simulate a destination failure", async () => {
+    const app = buildApp({
+      deliveryClient: createDeliveryClient(),
+      logger: false,
+      mockReceiverStatusCode: 503,
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/mock/webhooks",
+      payload: {
+        id: "a545a04d-5380-4d9c-bca8-37f20936e942",
+        eventType: "invoice.created",
+        data: { invoiceId: "inv_123" },
+        createdAt: "2026-08-25T00:00:00.000Z",
+      },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ received: false });
+
+    await app.close();
+  });
 });

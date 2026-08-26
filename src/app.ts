@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
 import type { DeliveryClient, WebhookEvent } from "./delivery.js";
+import {
+  activeTraceFields,
+  OpenTelemetryDeliveryTelemetry,
+  type DeliveryTelemetry,
+} from "./telemetry.js";
 
 interface EventRequestBody {
   eventType: string;
@@ -11,6 +16,8 @@ interface EventRequestBody {
 interface BuildAppOptions {
   deliveryClient: DeliveryClient;
   logger?: boolean | FastifyBaseLogger;
+  mockReceiverStatusCode?: number;
+  telemetry?: DeliveryTelemetry;
 }
 
 const eventBodySchema = {
@@ -47,6 +54,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? true,
   });
+  const deliveryTelemetry =
+    options.telemetry ?? new OpenTelemetryDeliveryTelemetry();
+  const mockReceiverStatusCode = options.mockReceiverStatusCode ?? 200;
 
   app.get("/health", async () => ({ status: "ok" }));
 
@@ -57,16 +67,20 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         body: webhookEventSchema,
       },
     },
-    async (request) => {
+    async (request, reply) => {
       request.log.info(
         {
+          ...activeTraceFields(),
           eventId: request.body.id,
           eventType: request.body.eventType,
         },
         "Mock receiver accepted webhook",
       );
 
-      return { received: true };
+      return reply.code(mockReceiverStatusCode).send({
+        received:
+          mockReceiverStatusCode >= 200 && mockReceiverStatusCode < 300,
+      });
     },
   );
 
@@ -85,30 +99,48 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         createdAt: new Date().toISOString(),
       };
 
-      request.log.info(
-        { eventId: event.id, eventType: event.eventType },
-        "Webhook delivery started",
-      );
-
       try {
-        await options.deliveryClient.deliver(event);
-      } catch (error) {
-        request.log.error(
-          { err: error, eventId: event.id, eventType: event.eventType },
-          "Webhook delivery failed",
-        );
+        await deliveryTelemetry.trackDelivery(event.eventType, async () => {
+          request.log.info(
+            {
+              ...activeTraceFields(),
+              eventId: event.id,
+              eventType: event.eventType,
+            },
+            "Webhook delivery started",
+          );
 
+          try {
+            await options.deliveryClient.deliver(event);
+          } catch (error) {
+            request.log.error(
+              {
+                ...activeTraceFields(),
+                err: error,
+                eventId: event.id,
+                eventType: event.eventType,
+              },
+              "Webhook delivery failed",
+            );
+            throw error;
+          }
+
+          request.log.info(
+            {
+              ...activeTraceFields(),
+              eventId: event.id,
+              eventType: event.eventType,
+            },
+            "Webhook delivery completed",
+          );
+        });
+      } catch {
         return reply.code(502).send({
           eventId: event.id,
           status: "failed",
           error: "Webhook delivery failed",
         });
       }
-
-      request.log.info(
-        { eventId: event.id, eventType: event.eventType },
-        "Webhook delivery completed",
-      );
 
       return reply.code(201).send({
         eventId: event.id,

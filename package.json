@@ -1,6 +1,6 @@
 {
   "name": "observable-webhook-delivery",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A webhook delivery service for learning practical observability with OpenTelemetry.",
   "type": "module",
@@ -10,18 +10,27 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --import ./src/instrumentation.ts src/server.ts",
     "lint": "eslint .",
-    "start": "node dist/server.js",
+    "start": "node --import ./dist/instrumentation.js dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/instrumentation-http": "^0.221.0",
+    "@opentelemetry/instrumentation-undici": "^0.31.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
+    "@opentelemetry/sdk-node": "^0.221.0",
+    "@opentelemetry/sdk-trace-node": "^2.10.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "fastify": "^5.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
+    "@opentelemetry/context-async-hooks": "^2.10.0",
     "@types/node": "^24.3.1",
     "eslint": "^9.35.0",
     "tsx": "^4.20.5",
