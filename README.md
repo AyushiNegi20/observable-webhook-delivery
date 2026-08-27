@@ -85,6 +85,8 @@ The API listens on `http://localhost:3000` by default.
 
 Copy `.env.example` to `.env` to change the host, port, delivery target, timeout, mock receiver status, or telemetry settings. Environment variables can also be supplied directly to the process.
 
+Keep API keys and credentials in local environment files, never in committed source code. Files matching `.env.*` are ignored, while `.env.example` remains available as a safe configuration template.
+
 ## OpenTelemetry output
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
