@@ -125,7 +125,10 @@ pnpm build
 pnpm test
 pnpm lint
 pnpm typecheck
+pnpm verify
 ```
+
+Run `pnpm verify` before pushing to execute the complete local validation suite.
 
 ## Run with Docker
 
