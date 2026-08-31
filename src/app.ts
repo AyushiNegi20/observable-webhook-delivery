@@ -52,6 +52,7 @@ const webhookEventSchema = {
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
   const app = Fastify({
+    bodyLimit: 256 * 1024,
     logger: options.logger ?? true,
   });
   const deliveryTelemetry =

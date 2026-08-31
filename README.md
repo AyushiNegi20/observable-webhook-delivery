@@ -16,6 +16,7 @@ The project currently provides:
 - A local mock receiver
 - JSON request logging
 - Request validation and delivery timeouts
+- A 256 KB request body limit
 - Unit and integration tests
 - Docker support
 - Continuous integration with GitHub Actions

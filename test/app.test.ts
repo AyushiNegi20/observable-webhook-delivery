@@ -65,6 +65,25 @@ describe("webhook delivery API", () => {
     await app.close();
   });
 
+  it("rejects an oversized event before delivery", async () => {
+    const deliveryClient = createDeliveryClient();
+    const app = buildApp({ deliveryClient, logger: false });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/events",
+      payload: {
+        eventType: "invoice.created",
+        data: { content: "x".repeat(300_000) },
+      },
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(deliveryClient.deliver).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("returns a gateway error when delivery fails", async () => {
     const deliveryClient = createDeliveryClient(async () => {
       throw new Error("Destination unavailable");
