@@ -59,6 +59,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     options.telemetry ?? new OpenTelemetryDeliveryTelemetry();
   const mockReceiverStatusCode = options.mockReceiverStatusCode ?? 200;
 
+  app.addHook("onSend", async (request, reply) => {
+    reply.header("x-request-id", request.id);
+  });
+
   app.get("/health", async () => ({ status: "ok" }));
 
   app.post<{ Body: WebhookEvent }>(

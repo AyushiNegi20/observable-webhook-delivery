@@ -15,6 +15,7 @@ The project currently provides:
 - A webhook event API
 - A local mock receiver
 - JSON request logging
+- Request identifiers returned in the `x-request-id` response header
 - Request validation and delivery timeouts
 - A 256 KB request body limit
 - Unit and integration tests
