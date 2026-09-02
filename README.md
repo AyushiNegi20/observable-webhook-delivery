@@ -61,6 +61,9 @@ A successful delivery returns:
 GET /health
 ```
 
+Health responses use `Cache-Control: no-store` so operational checks always see
+the current service status.
+
 ### Mock receiver
 
 ```http

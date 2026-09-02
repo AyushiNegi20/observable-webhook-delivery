@@ -19,6 +19,7 @@ describe("webhook delivery API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-request-id"]).toBeTruthy();
 
     await app.close();
