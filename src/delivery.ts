@@ -30,6 +30,8 @@ export class HttpDeliveryClient implements DeliveryClient {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "x-webhook-event": event.eventType,
+          "x-webhook-id": event.id,
         },
         body: JSON.stringify(event),
         signal: AbortSignal.timeout(this.timeoutMs),

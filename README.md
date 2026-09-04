@@ -72,6 +72,9 @@ POST /mock/webhooks
 
 The mock receiver is the only configured destination in the first milestone. Arbitrary destination URLs are intentionally not accepted from API clients.
 
+Outgoing deliveries include `x-webhook-id` and `x-webhook-event` headers so
+receivers can identify the delivery and event type before parsing the payload.
+
 ## Run locally
 
 Requirements:
