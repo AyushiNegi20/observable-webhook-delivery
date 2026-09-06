@@ -30,6 +30,7 @@ export class HttpDeliveryClient implements DeliveryClient {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "x-webhook-created-at": event.createdAt,
           "x-webhook-event": event.eventType,
           "x-webhook-id": event.id,
         },
