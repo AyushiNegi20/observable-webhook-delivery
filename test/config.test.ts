@@ -19,6 +19,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects a non-HTTP delivery target", () => {
+    expect(() => loadConfig({ DELIVERY_TARGET_URL: "ftp://receiver.test" })).toThrow(
+      "Expected DELIVERY_TARGET_URL to be a valid HTTP URL",
+    );
+  });
+
   it("loads a mock receiver failure status", () => {
     expect(loadConfig({ MOCK_RECEIVER_STATUS_CODE: "503" })).toMatchObject({
       mockReceiverStatusCode: 503,

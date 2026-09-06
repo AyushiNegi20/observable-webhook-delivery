@@ -32,14 +32,32 @@ function readHttpStatus(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function readHttpUrl(value: string): string {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("Expected DELIVERY_TARGET_URL to be a valid HTTP URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Expected DELIVERY_TARGET_URL to be a valid HTTP URL");
+  }
+
+  return value;
+}
+
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const port = readPositiveInteger(environment.PORT, 3000);
+  const deliveryTargetUrl =
+    environment.DELIVERY_TARGET_URL ??
+    `http://127.0.0.1:${port}/mock/webhooks`;
 
   return {
     host: environment.HOST ?? "0.0.0.0",
     port,
-    deliveryTargetUrl:
-      environment.DELIVERY_TARGET_URL ?? `http://127.0.0.1:${port}/mock/webhooks`,
+    deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
     deliveryTimeoutMs: readPositiveInteger(environment.DELIVERY_TIMEOUT_MS, 3000),
     mockReceiverStatusCode: readHttpStatus(
       environment.MOCK_RECEIVER_STATUS_CODE,
