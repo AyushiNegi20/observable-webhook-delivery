@@ -51,4 +51,16 @@ describe("HTTP delivery client", () => {
       new DeliveryError("Webhook destination responded with status 503"),
     );
   });
+
+  it("wraps network failures as delivery errors", async () => {
+    const networkError = new Error("Connection refused");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(networkError));
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    await expect(client.deliver(event)).rejects.toMatchObject({
+      name: "DeliveryError",
+      message: "Webhook destination could not be reached",
+      cause: networkError,
+    });
+  });
 });
