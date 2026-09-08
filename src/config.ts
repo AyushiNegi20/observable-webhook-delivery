@@ -45,6 +45,10 @@ function readHttpUrl(value: string): string {
     throw new Error("Expected DELIVERY_TARGET_URL to be a valid HTTP URL");
   }
 
+  if (parsed.username !== "" || parsed.password !== "") {
+    throw new Error("DELIVERY_TARGET_URL must not contain credentials");
+  }
+
   return value;
 }
 

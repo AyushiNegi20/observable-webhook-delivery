@@ -25,6 +25,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects credentials in the delivery target", () => {
+    expect(() =>
+      loadConfig({ DELIVERY_TARGET_URL: "https://user:secret@receiver.test" }),
+    ).toThrow("DELIVERY_TARGET_URL must not contain credentials");
+  });
+
   it("loads a mock receiver failure status", () => {
     expect(loadConfig({ MOCK_RECEIVER_STATUS_CODE: "503" })).toMatchObject({
       mockReceiverStatusCode: 503,

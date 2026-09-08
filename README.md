@@ -97,6 +97,10 @@ Copy `.env.example` to `.env` to change the host, port, delivery target, timeout
 
 Keep API keys and credentials in local environment files, never in committed source code. Files matching `.env.*` are ignored, while `.env.example` remains available as a safe configuration template.
 
+Credentials embedded directly in `DELIVERY_TARGET_URL` are rejected because URLs
+may appear in HTTP telemetry. Authentication should be added through a dedicated
+secret-backed header in a later milestone.
+
 ## OpenTelemetry output
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
