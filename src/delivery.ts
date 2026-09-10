@@ -31,6 +31,7 @@ export class HttpDeliveryClient implements DeliveryClient {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
+          "user-agent": "observable-webhook-delivery",
           "x-webhook-created-at": event.createdAt,
           "x-webhook-event": event.eventType,
           "x-webhook-id": event.id,

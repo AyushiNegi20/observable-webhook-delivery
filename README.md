@@ -75,7 +75,8 @@ The mock receiver is the only configured destination in the first milestone. Arb
 
 Outgoing deliveries include `x-webhook-id`, `x-webhook-event`, and
 `x-webhook-created-at` headers so receivers can identify and order events before
-parsing the payload.
+parsing the payload. The `User-Agent` header identifies this delivery service in
+receiver access logs.
 
 ## Run locally
 
