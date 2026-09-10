@@ -29,6 +29,7 @@ export class HttpDeliveryClient implements DeliveryClient {
       response = await fetch(this.targetUrl, {
         method: "POST",
         headers: {
+          accept: "application/json",
           "content-type": "application/json",
           "x-webhook-created-at": event.createdAt,
           "x-webhook-event": event.eventType,
