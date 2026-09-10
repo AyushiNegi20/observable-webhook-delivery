@@ -25,6 +25,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects a malformed delivery target", () => {
+    expect(() => loadConfig({ DELIVERY_TARGET_URL: "not a URL" })).toThrow(
+      "Expected DELIVERY_TARGET_URL to be a valid HTTP URL",
+    );
+  });
+
   it("rejects credentials in the delivery target", () => {
     expect(() =>
       loadConfig({ DELIVERY_TARGET_URL: "https://user:secret@receiver.test" }),
