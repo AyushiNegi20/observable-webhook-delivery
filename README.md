@@ -73,10 +73,11 @@ POST /mock/webhooks
 
 The mock receiver is the only configured destination in the first milestone. Arbitrary destination URLs are intentionally not accepted from API clients.
 
-Outgoing deliveries include `x-webhook-id`, `x-webhook-event`, and
-`x-webhook-created-at` headers so receivers can identify and order events before
-parsing the payload. The `User-Agent` header identifies this delivery service in
-receiver access logs.
+Outgoing deliveries include `x-webhook-id`, `x-webhook-event`,
+`x-webhook-created-at`, and `x-webhook-attempt` headers so receivers can identify
+and order events before parsing the payload. The attempt is currently always `1`
+and will increase when retries are introduced. The `User-Agent` header identifies
+this delivery service in receiver access logs.
 
 ## Run locally
 
