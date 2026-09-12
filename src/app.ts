@@ -46,7 +46,7 @@ const webhookEventSchema = {
     id: { type: "string", format: "uuid" },
     eventType: { type: "string" },
     data: { type: "object", additionalProperties: true },
-    createdAt: { type: "string" },
+    createdAt: { type: "string", format: "date-time" },
   },
 } as const;
 
