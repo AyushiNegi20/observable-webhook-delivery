@@ -20,17 +20,19 @@ interface BuildAppOptions {
   telemetry?: DeliveryTelemetry;
 }
 
+const eventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 100,
+  pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+} as const;
+
 const eventBodySchema = {
   type: "object",
   additionalProperties: false,
   required: ["eventType", "data"],
   properties: {
-    eventType: {
-      type: "string",
-      minLength: 1,
-      maxLength: 100,
-      pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
-    },
+    eventType: eventTypeSchema,
     data: {
       type: "object",
       additionalProperties: true,
@@ -44,7 +46,7 @@ const webhookEventSchema = {
   required: ["id", "eventType", "data", "createdAt"],
   properties: {
     id: { type: "string", format: "uuid" },
-    eventType: { type: "string" },
+    eventType: eventTypeSchema,
     data: { type: "object", additionalProperties: true },
     createdAt: { type: "string", format: "date-time" },
   },
