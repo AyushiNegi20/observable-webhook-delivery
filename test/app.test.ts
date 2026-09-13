@@ -18,7 +18,7 @@ describe("webhook delivery API", () => {
     const response = await app.inject({ method: "GET", url: "/health" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "ok" });
+    expect(response.json()).toEqual({ service: "webhook-api", status: "ok" });
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-request-id"]).toBeTruthy();
 

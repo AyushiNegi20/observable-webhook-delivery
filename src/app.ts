@@ -67,7 +67,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.get("/health", async (_request, reply) => {
     reply.header("cache-control", "no-store");
-    return { status: "ok" };
+    return { service: "webhook-api", status: "ok" };
   });
 
   app.post<{ Body: WebhookEvent }>(

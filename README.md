@@ -62,6 +62,9 @@ A successful delivery returns:
 GET /health
 ```
 
+The response identifies the service as `webhook-api` and reports its current
+status.
+
 Health responses use `Cache-Control: no-store` so operational checks always see
 the current service status.
 
