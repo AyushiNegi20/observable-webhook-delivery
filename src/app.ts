@@ -62,6 +62,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const mockReceiverStatusCode = options.mockReceiverStatusCode ?? 200;
 
   app.addHook("onSend", async (request, reply) => {
+    reply.header("x-content-type-options", "nosniff");
     reply.header("x-request-id", request.id);
   });
 

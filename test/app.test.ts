@@ -24,6 +24,7 @@ describe("webhook delivery API", () => {
       version: "0.2.0",
     });
     expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-request-id"]).toBeTruthy();
 
     await app.close();
