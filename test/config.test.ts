@@ -25,6 +25,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects an empty host", () => {
+    expect(() => loadConfig({ HOST: "   " })).toThrow(
+      "Expected HOST to be a non-empty value",
+    );
+  });
+
   it("rejects a non-HTTP delivery target", () => {
     expect(() => loadConfig({ DELIVERY_TARGET_URL: "ftp://receiver.test" })).toThrow(
       "Expected DELIVERY_TARGET_URL to be a valid HTTP URL",

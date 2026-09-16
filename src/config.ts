@@ -28,6 +28,18 @@ function readPort(value: string | undefined): number {
   return port;
 }
 
+function readHost(value: string | undefined): string {
+  if (value === undefined) {
+    return "0.0.0.0";
+  }
+
+  if (value.trim() === "") {
+    throw new Error("Expected HOST to be a non-empty value");
+  }
+
+  return value;
+}
+
 function readHttpStatus(value: string | undefined, fallback: number): number {
   if (value === undefined) {
     return fallback;
@@ -68,7 +80,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     `http://127.0.0.1:${port}/mock/webhooks`;
 
   return {
-    host: environment.HOST ?? "0.0.0.0",
+    host: readHost(environment.HOST),
     port,
     deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
     deliveryTimeoutMs: readPositiveInteger(environment.DELIVERY_TIMEOUT_MS, 3000),
