@@ -173,6 +173,25 @@ describe("webhook delivery API", () => {
     await app.close();
   });
 
+  it("rejects a webhook with an invalid event ID", async () => {
+    const app = buildApp({ deliveryClient: createDeliveryClient(), logger: false });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/mock/webhooks",
+      payload: {
+        id: "invoice-123",
+        eventType: "invoice.created",
+        data: { invoiceId: "inv_123" },
+        createdAt: "2026-08-25T00:00:00.000Z",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
   it("can simulate a destination failure", async () => {
     const app = buildApp({
       deliveryClient: createDeliveryClient(),
