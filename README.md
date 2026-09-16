@@ -18,6 +18,7 @@ The project currently provides:
 - Request identifiers returned in the `x-request-id` response header
 - MIME sniffing protection on API responses
 - Request validation and delivery timeouts
+- Startup validation for host and port settings
 - Startup validation for the webhook destination URL
 - A 256 KB request body limit
 - Unit and integration tests

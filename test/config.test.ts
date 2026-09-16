@@ -19,6 +19,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects a port outside the TCP range", () => {
+    expect(() => loadConfig({ PORT: "65536" })).toThrow(
+      "Expected PORT to be at most 65535",
+    );
+  });
+
   it("rejects a non-HTTP delivery target", () => {
     expect(() => loadConfig({ DELIVERY_TARGET_URL: "ftp://receiver.test" })).toThrow(
       "Expected DELIVERY_TARGET_URL to be a valid HTTP URL",

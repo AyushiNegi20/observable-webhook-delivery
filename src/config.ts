@@ -19,6 +19,15 @@ function readPositiveInteger(value: string | undefined, fallback: number): numbe
   return parsed;
 }
 
+function readPort(value: string | undefined): number {
+  const port = readPositiveInteger(value, 3000);
+  if (port > 65535) {
+    throw new Error(`Expected PORT to be at most 65535 but received: ${value}`);
+  }
+
+  return port;
+}
+
 function readHttpStatus(value: string | undefined, fallback: number): number {
   if (value === undefined) {
     return fallback;
@@ -53,7 +62,7 @@ function readHttpUrl(value: string): string {
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
-  const port = readPositiveInteger(environment.PORT, 3000);
+  const port = readPort(environment.PORT);
   const deliveryTargetUrl =
     environment.DELIVERY_TARGET_URL ??
     `http://127.0.0.1:${port}/mock/webhooks`;
