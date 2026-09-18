@@ -56,6 +56,16 @@ describe("HTTP delivery client", () => {
     );
   });
 
+  it("accepts a no-content success response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    await expect(client.deliver(event)).resolves.toBeUndefined();
+  });
+
   it("wraps network failures as delivery errors", async () => {
     const networkError = new Error("Connection refused");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(networkError));
