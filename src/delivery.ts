@@ -36,6 +36,7 @@ export class HttpDeliveryClient implements DeliveryClient {
           "x-webhook-created-at": event.createdAt,
           "x-webhook-event": event.eventType,
           "x-webhook-id": event.id,
+          "x-webhook-schema-version": "1",
         },
         body: JSON.stringify(event),
         signal: AbortSignal.timeout(this.timeoutMs),

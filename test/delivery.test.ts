@@ -38,6 +38,7 @@ describe("HTTP delivery client", () => {
           "x-webhook-created-at": "2026-08-25T00:00:00.000Z",
           "x-webhook-event": "invoice.created",
           "x-webhook-id": "a545a04d-5380-4d9c-bca8-37f20936e942",
+          "x-webhook-schema-version": "1",
         },
       }),
     );
