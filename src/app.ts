@@ -54,6 +54,11 @@ const webhookEventSchema = {
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
   const app = Fastify({
+    ajv: {
+      customOptions: {
+        removeAdditional: false,
+      },
+    },
     bodyLimit: 256 * 1024,
     logger: options.logger ?? true,
   });

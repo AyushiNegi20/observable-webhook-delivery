@@ -19,6 +19,7 @@ The project currently provides:
 - Cache prevention on all API responses
 - MIME sniffing protection on API responses
 - Request validation and delivery timeouts
+- Rejection of unknown request fields
 - Startup validation for host and port settings
 - Startup validation for the webhook destination URL
 - A 256 KB request body limit

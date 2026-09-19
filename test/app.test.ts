@@ -73,6 +73,26 @@ describe("webhook delivery API", () => {
     await app.close();
   });
 
+  it("rejects unexpected event fields", async () => {
+    const deliveryClient = createDeliveryClient();
+    const app = buildApp({ deliveryClient, logger: false });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/events",
+      payload: {
+        eventType: "invoice.created",
+        data: { invoiceId: "inv_123" },
+        destinationUrl: "https://unexpected.test/webhooks",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(deliveryClient.deliver).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("rejects an oversized event before delivery", async () => {
     const deliveryClient = createDeliveryClient();
     const app = buildApp({ deliveryClient, logger: false });
