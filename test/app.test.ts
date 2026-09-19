@@ -45,6 +45,7 @@ describe("webhook delivery API", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ status: "delivered" });
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(deliveryClient.deliver).toHaveBeenCalledOnce();
     expect(deliveryClient.deliver).toHaveBeenCalledWith(
       expect.objectContaining({

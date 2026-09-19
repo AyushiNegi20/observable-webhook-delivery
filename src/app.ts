@@ -62,14 +62,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const mockReceiverStatusCode = options.mockReceiverStatusCode ?? 200;
 
   app.addHook("onSend", async (request, reply) => {
+    reply.header("cache-control", "no-store");
     reply.header("x-content-type-options", "nosniff");
     reply.header("x-request-id", request.id);
   });
 
-  app.get("/health", async (_request, reply) => {
-    reply.header("cache-control", "no-store");
-    return { service: "webhook-api", status: "ok", version: "0.2.0" };
-  });
+  app.get("/health", async () => ({
+    service: "webhook-api",
+    status: "ok",
+    version: "0.2.0",
+  }));
 
   app.post<{ Body: WebhookEvent }>(
     "/mock/webhooks",

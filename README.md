@@ -16,6 +16,7 @@ The project currently provides:
 - A local mock receiver
 - JSON request logging
 - Request identifiers returned in the `x-request-id` response header
+- Cache prevention on all API responses
 - MIME sniffing protection on API responses
 - Request validation and delivery timeouts
 - Startup validation for host and port settings
@@ -67,8 +68,8 @@ GET /health
 The response identifies the service as `webhook-api` and reports its current
 status and application version.
 
-Health responses use `Cache-Control: no-store` so operational checks always see
-the current service status.
+API responses use `Cache-Control: no-store` so clients and operational checks
+always receive current results.
 
 ### Mock receiver
 
