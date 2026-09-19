@@ -110,7 +110,8 @@ may appear in HTTP telemetry. Authentication should be added through a dedicated
 secret-backed header in a later milestone.
 
 Webhook redirects are disabled so payloads are only sent to the configured
-destination.
+destination. URL fragments are rejected because they are not transmitted in HTTP
+requests.
 
 ## OpenTelemetry output
 

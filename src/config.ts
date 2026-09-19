@@ -70,6 +70,10 @@ function readHttpUrl(value: string): string {
     throw new Error("DELIVERY_TARGET_URL must not contain credentials");
   }
 
+  if (parsed.hash !== "") {
+    throw new Error("DELIVERY_TARGET_URL must not contain a fragment");
+  }
+
   return value;
 }
 

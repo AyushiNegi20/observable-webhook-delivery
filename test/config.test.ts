@@ -49,6 +49,12 @@ describe("application configuration", () => {
     ).toThrow("DELIVERY_TARGET_URL must not contain credentials");
   });
 
+  it("rejects a fragment in the delivery target", () => {
+    expect(() =>
+      loadConfig({ DELIVERY_TARGET_URL: "https://receiver.test/webhooks#events" }),
+    ).toThrow("DELIVERY_TARGET_URL must not contain a fragment");
+  });
+
   it("loads a mock receiver failure status", () => {
     expect(loadConfig({ MOCK_RECEIVER_STATUS_CODE: "503" })).toMatchObject({
       mockReceiverStatusCode: 503,
