@@ -109,6 +109,9 @@ Credentials embedded directly in `DELIVERY_TARGET_URL` are rejected because URLs
 may appear in HTTP telemetry. Authentication should be added through a dedicated
 secret-backed header in a later milestone.
 
+Webhook redirects are disabled so payloads are only sent to the configured
+destination.
+
 ## OpenTelemetry output
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.

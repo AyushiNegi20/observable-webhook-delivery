@@ -39,6 +39,7 @@ export class HttpDeliveryClient implements DeliveryClient {
           "x-webhook-schema-version": "1",
         },
         body: JSON.stringify(event),
+        redirect: "error",
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {

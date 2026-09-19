@@ -30,6 +30,7 @@ describe("HTTP delivery client", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify(event),
+        redirect: "error",
         headers: {
           accept: "application/json",
           "content-type": "application/json",
