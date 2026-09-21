@@ -28,6 +28,17 @@ function readPort(value: string | undefined): number {
   return port;
 }
 
+function readDeliveryTimeout(value: string | undefined): number {
+  const timeoutMs = readPositiveInteger(value, 3000);
+  if (timeoutMs > 60_000) {
+    throw new Error(
+      `Expected DELIVERY_TIMEOUT_MS to be at most 60000 but received: ${value}`,
+    );
+  }
+
+  return timeoutMs;
+}
+
 function readHost(value: string | undefined): string {
   if (value === undefined) {
     return "0.0.0.0";
@@ -87,7 +98,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     host: readHost(environment.HOST),
     port,
     deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
-    deliveryTimeoutMs: readPositiveInteger(environment.DELIVERY_TIMEOUT_MS, 3000),
+    deliveryTimeoutMs: readDeliveryTimeout(environment.DELIVERY_TIMEOUT_MS),
     mockReceiverStatusCode: readHttpStatus(
       environment.MOCK_RECEIVER_STATUS_CODE,
       200,

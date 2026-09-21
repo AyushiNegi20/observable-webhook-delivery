@@ -105,6 +105,8 @@ The API listens on `http://localhost:3000` by default.
 
 Copy `.env.example` to `.env` to change the host, port, delivery target, timeout, mock receiver status, or telemetry settings. Environment variables can also be supplied directly to the process.
 
+Delivery timeouts must be positive and cannot exceed 60 seconds.
+
 Keep API keys and credentials in local environment files, never in committed source code. Files matching `.env.*` are ignored, while `.env.example` remains available as a safe configuration template.
 
 Credentials embedded directly in `DELIVERY_TARGET_URL` are rejected because URLs

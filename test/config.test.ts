@@ -19,6 +19,12 @@ describe("application configuration", () => {
     );
   });
 
+  it("rejects an excessive delivery timeout", () => {
+    expect(() => loadConfig({ DELIVERY_TIMEOUT_MS: "60001" })).toThrow(
+      "Expected DELIVERY_TIMEOUT_MS to be at most 60000",
+    );
+  });
+
   it("rejects a port outside the TCP range", () => {
     expect(() => loadConfig({ PORT: "65536" })).toThrow(
       "Expected PORT to be at most 65535",
