@@ -1,4 +1,10 @@
-import { context, SpanStatusCode } from "@opentelemetry/api";
+import {
+  context,
+  INVALID_SPAN_CONTEXT,
+  SpanStatusCode,
+  trace,
+  TraceFlags,
+} from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   AggregationTemporality,
@@ -12,12 +18,70 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   activeTraceFields,
   OpenTelemetryDeliveryTelemetry,
 } from "../src/telemetry.js";
+
+describe("trace log fields", () => {
+  beforeEach(() => {
+    context.setGlobalContextManager(
+      new AsyncLocalStorageContextManager().enable(),
+    );
+  });
+
+  afterEach(() => {
+    context.disable();
+  });
+
+  it("omits trace fields when there is no active span", () => {
+    expect(activeTraceFields()).toEqual({});
+  });
+
+  it.each([
+    { name: "both IDs are invalid", ...INVALID_SPAN_CONTEXT },
+    {
+      name: "the trace ID is invalid",
+      ...INVALID_SPAN_CONTEXT,
+      spanId: "0123456789abcdef",
+    },
+    {
+      name: "the span ID is invalid",
+      ...INVALID_SPAN_CONTEXT,
+      traceId: "0123456789abcdef0123456789abcdef",
+    },
+  ])(
+    "omits trace fields when $name",
+    ({ traceId, spanId, traceFlags }) => {
+      const activeContext = trace.setSpanContext(context.active(), {
+        traceId,
+        spanId,
+        traceFlags,
+      });
+
+      expect(context.with(activeContext, activeTraceFields)).toEqual({});
+    },
+  );
+
+  it.each([TraceFlags.NONE, TraceFlags.SAMPLED])(
+    "keeps valid trace fields with trace flags %i",
+    (traceFlags) => {
+      const spanContext = {
+        traceId: "0123456789abcdef0123456789abcdef",
+        spanId: "0123456789abcdef",
+        traceFlags,
+      };
+      const activeContext = trace.setSpanContext(context.active(), spanContext);
+
+      expect(context.with(activeContext, activeTraceFields)).toEqual({
+        traceId: spanContext.traceId,
+        spanId: spanContext.spanId,
+      });
+    },
+  );
+});
 
 describe("delivery telemetry", () => {
   it("records successful and failed deliveries", async () => {

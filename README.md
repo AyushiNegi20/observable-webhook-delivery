@@ -137,7 +137,10 @@ The custom metrics are:
 | `webhook.delivery.failures` | Counter | Counts failed deliveries |
 | `webhook.delivery.duration` | Histogram | Records delivery time in milliseconds |
 
-Delivery logs include the active `traceId` and `spanId`. Event payloads are not added to telemetry.
+Delivery logs include the active `traceId` and `spanId` when the span context is
+valid. Missing or invalid contexts are omitted instead of logging all-zero IDs.
+Valid IDs are retained even when the trace is not sampled. Event payloads are not
+added to telemetry.
 
 To simulate an unavailable destination, restart the application with:
 

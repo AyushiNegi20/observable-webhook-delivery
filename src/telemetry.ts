@@ -1,4 +1,5 @@
 import {
+  isSpanContextValid,
   metrics,
   SpanStatusCode,
   trace,
@@ -90,6 +91,10 @@ export function activeTraceFields(): Record<string, string> {
   }
 
   const context = span.spanContext();
+  if (!isSpanContextValid(context)) {
+    return {};
+  }
+
   return {
     traceId: context.traceId,
     spanId: context.spanId,
