@@ -12,6 +12,8 @@ import {
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 
+const maxMetricExportIntervalMs = 2_147_483_647;
+
 function readMetricExportInterval(): number {
   const value = process.env.OTEL_METRIC_EXPORT_INTERVAL_MS;
   if (value === undefined) {
@@ -19,9 +21,13 @@ function readMetricExportInterval(): number {
   }
 
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+  if (
+    !Number.isInteger(parsed) ||
+    parsed <= 0 ||
+    parsed > maxMetricExportIntervalMs
+  ) {
     throw new Error(
-      `Expected OTEL_METRIC_EXPORT_INTERVAL_MS to be a positive integer but received: ${value}`,
+      `Expected OTEL_METRIC_EXPORT_INTERVAL_MS to be an integer between 1 and ${maxMetricExportIntervalMs} but received: ${value}`,
     );
   }
 
