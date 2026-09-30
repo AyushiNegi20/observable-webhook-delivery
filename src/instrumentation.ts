@@ -50,13 +50,9 @@ const sdk = new NodeSDK({
 
 sdk.start();
 
-let shutdownStarted = false;
+let shutdownPromise: Promise<void> | undefined;
 
-export async function shutdownTelemetry(): Promise<void> {
-  if (shutdownStarted) {
-    return;
-  }
-
-  shutdownStarted = true;
-  await sdk.shutdown();
+export function shutdownTelemetry(): Promise<void> {
+  shutdownPromise ??= sdk.shutdown();
+  return shutdownPromise;
 }

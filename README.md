@@ -164,6 +164,10 @@ Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 `success` or `failure`. The duration histogram uses the same attribute, so traces
 and delivery timing measurements can be filtered by the same outcome.
 
+Telemetry shutdown runs once. Concurrent shutdown requests wait for the same
+exporter flush, and all callers receive the same completion result. A failed
+shutdown remains visible to later callers instead of being reported as successful.
+
 ## Commands
 
 ```bash

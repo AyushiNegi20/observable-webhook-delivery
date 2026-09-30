@@ -71,3 +71,59 @@ describe("metric export interval", () => {
     15_000,
   );
 });
+
+describe("telemetry shutdown", () => {
+  it("makes concurrent callers wait for the exporter flush", async () => {
+    let finishShutdown!: () => void;
+    sdk.shutdown.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishShutdown = resolve;
+      }),
+    );
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+    const first = shutdownTelemetry();
+    const second = shutdownTelemetry();
+    const secondFinished = vi.fn();
+    const observedSecond = second.then(secondFinished);
+
+    try {
+      await Promise.resolve();
+      expect(secondFinished).not.toHaveBeenCalled();
+      expect(sdk.shutdown).toHaveBeenCalledOnce();
+
+      finishShutdown();
+      await Promise.all([first, observedSecond]);
+      expect(secondFinished).toHaveBeenCalledOnce();
+    } finally {
+      finishShutdown();
+      await Promise.all([first, observedSecond]);
+    }
+  }, 15_000);
+
+  it("does not shut the SDK down again after completion", async () => {
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+
+    await shutdownTelemetry();
+    await shutdownTelemetry();
+
+    expect(sdk.shutdown).toHaveBeenCalledOnce();
+  }, 15_000);
+
+  it("reports a shutdown failure to concurrent and later callers", async () => {
+    const failure = new Error("Exporter flush failed");
+    sdk.shutdown.mockRejectedValue(failure);
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+
+    const outcomes = await Promise.allSettled([
+      shutdownTelemetry(),
+      shutdownTelemetry(),
+    ]);
+
+    expect(outcomes).toEqual([
+      { status: "rejected", reason: failure },
+      { status: "rejected", reason: failure },
+    ]);
+    await expect(shutdownTelemetry()).rejects.toBe(failure);
+    expect(sdk.shutdown).toHaveBeenCalledOnce();
+  }, 15_000);
+});
