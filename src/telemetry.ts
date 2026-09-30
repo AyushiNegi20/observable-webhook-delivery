@@ -73,6 +73,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
 
           throw error;
         } finally {
+          span.setAttribute("webhook.delivery.result", result);
           this.duration.record(performance.now() - startedAt, {
             ...attributes,
             "webhook.delivery.result": result,

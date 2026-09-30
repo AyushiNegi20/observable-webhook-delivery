@@ -127,7 +127,10 @@ describe("delivery telemetry", () => {
     expect(spans[0]?.attributes).toMatchObject({
       "webhook.event.type": "invoice.created",
       "webhook.delivery.system": "http",
+      "webhook.delivery.result": "success",
     });
+    expect(spans[0]?.status.code).toBe(SpanStatusCode.UNSET);
+    expect(spans[1]?.attributes["webhook.delivery.result"]).toBe("failure");
     expect(spans[1]?.status.code).toBe(SpanStatusCode.ERROR);
     expect(spans[1]?.events[0]?.name).toBe("exception");
 

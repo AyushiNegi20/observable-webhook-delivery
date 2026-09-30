@@ -150,6 +150,10 @@ MOCK_RECEIVER_STATUS_CODE=503
 
 The `/events` endpoint will return `502`, the delivery span will have an error status, and the failure counter will increase.
 
+Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
+`success` or `failure`. The duration histogram uses the same attribute, so traces
+and delivery timing measurements can be filtered by the same outcome.
+
 ## Commands
 
 ```bash
