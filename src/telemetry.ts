@@ -8,6 +8,7 @@ import {
   type Histogram,
   type Meter,
   type Tracer,
+  type UpDownCounter,
 } from "@opentelemetry/api";
 
 const instrumentationName = "observable-webhook-delivery";
@@ -19,6 +20,7 @@ export interface DeliveryTelemetry {
 export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
   private readonly attempts: Counter;
   private readonly failures: Counter;
+  private readonly active: UpDownCounter;
   private readonly duration: Histogram;
 
   constructor(
@@ -32,6 +34,10 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
     this.failures = meter.createCounter("webhook.delivery.failures", {
       description: "Number of failed webhook deliveries",
       unit: "{failure}",
+    });
+    this.active = meter.createUpDownCounter("webhook.delivery.active", {
+      description: "Number of webhook deliveries currently in progress",
+      unit: "{delivery}",
     });
     this.duration = meter.createHistogram("webhook.delivery.duration", {
       description: "Time spent delivering a webhook",
@@ -56,6 +62,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
       async (span) => {
         const startedAt = performance.now();
         let result = "success";
+        this.active.add(1, attributes);
 
         try {
           return await operation();
@@ -73,6 +80,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
 
           throw error;
         } finally {
+          this.active.add(-1, attributes);
           span.setAttribute("webhook.delivery.result", result);
           this.duration.record(performance.now() - startedAt, {
             ...attributes,

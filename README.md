@@ -28,7 +28,7 @@ The project currently provides:
 - Continuous integration with GitHub Actions
 - Automatic tracing for incoming and outgoing HTTP requests
 - A custom span for the webhook delivery operation
-- Delivery attempt, failure, and duration metrics
+- Delivery attempt, failure, in-progress, and duration metrics
 - Trace and span identifiers in delivery logs
 - A configurable mock receiver failure mode
 
@@ -135,7 +135,13 @@ The custom metrics are:
 |---|---|---|
 | `webhook.delivery.attempts` | Counter | Counts delivery attempts |
 | `webhook.delivery.failures` | Counter | Counts failed deliveries |
+| `webhook.delivery.active` | UpDownCounter | Counts deliveries currently in progress |
 | `webhook.delivery.duration` | Histogram | Records delivery time in milliseconds |
+
+The active delivery count increases when a delivery starts and decreases when it
+finishes, including failed deliveries. It measures in-progress work in this
+process, not queued events. Short deliveries may finish between metric exports,
+so use the attempt counter to measure total traffic.
 
 Delivery logs include the active `traceId` and `spanId` when the span context is
 valid. Missing or invalid contexts are omitted instead of logging all-zero IDs.
