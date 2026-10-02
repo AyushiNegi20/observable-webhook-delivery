@@ -189,6 +189,10 @@ pnpm verify
 
 Run `pnpm verify` before pushing to execute the complete local validation suite.
 
+Trace-context tests check parent-child relationships across asynchronous work,
+parent-context restoration after success or failure, and log identifier isolation
+between concurrent deliveries.
+
 ## Run with Docker
 
 ```bash
