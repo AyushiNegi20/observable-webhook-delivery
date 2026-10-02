@@ -121,6 +121,9 @@ requests.
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
 
+`OTEL_SERVICE_NAME` defaults to `webhook-api`. Surrounding whitespace is trimmed,
+and blank names are rejected at startup so telemetry always has a service name.
+
 `OTEL_METRIC_EXPORT_INTERVAL_MS` defaults to `5000`. It must be an integer from
 `1` to `2147483647` milliseconds. Larger values exceed Node's timer range and are
 rejected at startup instead of being reduced to a one-millisecond interval.

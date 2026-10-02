@@ -1,12 +1,18 @@
+import type { NodeSDKConfiguration } from "@opentelemetry/sdk-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sdk = vi.hoisted(() => ({
+  configure: vi.fn<(options: Partial<NodeSDKConfiguration>) => void>(),
   start: vi.fn(),
   shutdown: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock("@opentelemetry/sdk-node", () => ({
   NodeSDK: class {
+    constructor(options: Partial<NodeSDKConfiguration>) {
+      sdk.configure(options);
+    }
+
     start = sdk.start;
     shutdown = sdk.shutdown;
   },
@@ -22,13 +28,45 @@ vi.mock("@opentelemetry/instrumentation-undici", () => ({
 
 beforeEach(() => {
   vi.resetModules();
+  sdk.configure.mockReset();
   sdk.start.mockReset();
   sdk.shutdown.mockReset().mockResolvedValue(undefined);
   vi.stubEnv("OTEL_METRIC_EXPORT_INTERVAL_MS", undefined);
+  vi.stubEnv("OTEL_SERVICE_NAME", undefined);
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+describe("telemetry service name", () => {
+  it.each(["", "   ", "\t\n"])(
+    "rejects a blank service name: %j",
+    async (value) => {
+      vi.stubEnv("OTEL_SERVICE_NAME", value);
+
+      await expect(import("../src/instrumentation.js")).rejects.toThrow(
+        "Expected OTEL_SERVICE_NAME to be a non-empty value",
+      );
+      expect(sdk.start).not.toHaveBeenCalled();
+    },
+    15_000,
+  );
+
+  it.each([
+    { value: undefined, expected: "webhook-api" },
+    { value: "delivery-worker", expected: "delivery-worker" },
+    { value: "  delivery-worker  ", expected: "delivery-worker" },
+  ])("uses service name $expected for $value", async ({ value, expected }) => {
+    vi.stubEnv("OTEL_SERVICE_NAME", value);
+
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+
+    expect(sdk.configure).toHaveBeenCalledOnce();
+    expect(sdk.configure.mock.calls[0]?.[0].serviceName).toBe(expected);
+    expect(sdk.start).toHaveBeenCalledOnce();
+    await shutdownTelemetry();
+  }, 15_000);
 });
 
 describe("metric export interval", () => {
