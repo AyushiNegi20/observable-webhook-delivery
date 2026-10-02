@@ -42,6 +42,12 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
     this.duration = meter.createHistogram("webhook.delivery.duration", {
       description: "Time spent delivering a webhook",
       unit: "ms",
+      advice: {
+        explicitBucketBoundaries: [
+          0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2000, 2500, 3000,
+          5000, 7500, 10000, 30000, 60000,
+        ],
+      },
     });
   }
 

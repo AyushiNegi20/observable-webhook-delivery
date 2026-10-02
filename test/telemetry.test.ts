@@ -158,6 +158,20 @@ describe("delivery telemetry", () => {
       throw new Error("Expected a duration histogram");
     }
 
+    expect(duration.descriptor.unit).toBe("ms");
+    expect(duration.dataPoints).toHaveLength(2);
+    for (const point of duration.dataPoints) {
+      expect(point.value.buckets.boundaries).toEqual([
+        0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2000, 2500, 3000,
+        5000, 7500, 10000, 30000, 60000,
+      ]);
+      const bucketCount = point.value.buckets.counts.reduce(
+        (sum, count) => sum + count,
+        0,
+      );
+      expect(bucketCount).toBe(point.value.count);
+    }
+
     const recordedDurations = duration.dataPoints.reduce(
       (total, point) => total + point.value.count,
       0,

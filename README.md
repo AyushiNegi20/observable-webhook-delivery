@@ -145,6 +145,11 @@ The custom metrics are:
 | `webhook.delivery.active` | UpDownCounter | Counts deliveries currently in progress |
 | `webhook.delivery.duration` | Histogram | Records delivery time in milliseconds |
 
+The duration histogram includes bucket boundaries at 2, 3, 30, and 60 seconds,
+alongside finer buckets for fast deliveries. These make it easier to see latency
+near the default three-second timeout and the maximum supported timeout. Bucket
+boundaries do not change the delivery timeout itself.
+
 The active delivery count increases when a delivery starts and decreases when it
 finishes, including failed deliveries. It measures in-progress work in this
 process, not queued events. Short deliveries may finish between metric exports,
