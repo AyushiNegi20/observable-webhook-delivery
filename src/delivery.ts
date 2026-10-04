@@ -9,10 +9,18 @@ export interface DeliveryClient {
   deliver(event: WebhookEvent): Promise<void>;
 }
 
+export type DeliveryFailureReason = "network" | "timeout" | "http_status" | "unknown";
+
 export class DeliveryError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  readonly reason: DeliveryFailureReason;
+
+  constructor(
+    message: string,
+    options?: ErrorOptions & { reason?: DeliveryFailureReason },
+  ) {
     super(message, options);
     this.name = "DeliveryError";
+    this.reason = options?.reason ?? "unknown";
   }
 }
 
@@ -23,6 +31,7 @@ export class HttpDeliveryClient implements DeliveryClient {
   ) {}
 
   async deliver(event: WebhookEvent): Promise<void> {
+    const signal = AbortSignal.timeout(this.timeoutMs);
     let response: Response;
 
     try {
@@ -40,12 +49,15 @@ export class HttpDeliveryClient implements DeliveryClient {
         },
         body: JSON.stringify(event),
         redirect: "error",
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal,
       });
     } catch (error) {
-      throw new DeliveryError("Webhook destination could not be reached", {
-        cause: error,
-      });
+      throw new DeliveryError(
+        signal.aborted
+          ? `Webhook destination timed out after ${this.timeoutMs} ms`
+          : "Webhook destination could not be reached",
+        { cause: error, reason: signal.aborted ? "timeout" : "network" },
+      );
     }
 
     await response.body?.cancel().catch(() => {
@@ -55,6 +67,7 @@ export class HttpDeliveryClient implements DeliveryClient {
     if (!response.ok) {
       throw new DeliveryError(
         `Webhook destination responded with status ${response.status}`,
+        { reason: "http_status" },
       );
     }
   }

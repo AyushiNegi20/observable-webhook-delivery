@@ -107,6 +107,11 @@ Copy `.env.example` to `.env` to change the host, port, delivery target, timeout
 
 Delivery timeouts must be positive and cannot exceed 60 seconds.
 
+Delivery errors distinguish an expired deadline (`timeout`), a transport failure
+(`network`), and a non-successful HTTP response (`http_status`). Unclassified
+delivery errors use `unknown`. The public API keeps its generic `502` response;
+the reason is available on the internal error for troubleshooting.
+
 Keep API keys and credentials in local environment files, never in committed source code. Files matching `.env.*` are ignored, while `.env.example` remains available as a safe configuration template.
 
 Credentials embedded directly in `DELIVERY_TARGET_URL` are rejected because URLs

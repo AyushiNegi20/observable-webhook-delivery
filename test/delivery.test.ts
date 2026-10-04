@@ -14,6 +14,7 @@ const event: WebhookEvent = {
 };
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -52,9 +53,11 @@ describe("HTTP delivery client", () => {
     );
     const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
 
-    await expect(client.deliver(event)).rejects.toThrow(
-      new DeliveryError("Webhook destination responded with status 503"),
-    );
+    await expect(client.deliver(event)).rejects.toMatchObject({
+      name: "DeliveryError",
+      message: "Webhook destination responded with status 503",
+      reason: "http_status",
+    });
   });
 
   it("accepts a no-content success response", async () => {
@@ -107,7 +110,55 @@ describe("HTTP delivery client", () => {
     await expect(client.deliver(event)).rejects.toMatchObject({
       name: "DeliveryError",
       message: "Webhook destination could not be reached",
+      reason: "network",
       cause: networkError,
+    });
+  });
+
+  it("identifies a timeout when the delivery deadline aborts the request", async () => {
+    const controller = new AbortController();
+    const timeoutError = new DOMException("Delivery deadline exceeded", "TimeoutError");
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      controller.abort(timeoutError);
+      throw timeoutError;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    await expect(client.deliver(event)).rejects.toMatchObject({
+      name: "DeliveryError",
+      message: "Webhook destination timed out after 1000 ms",
+      reason: "timeout",
+      cause: timeoutError,
+    });
+    expect(timeout).toHaveBeenCalledWith(1000);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://receiver.test/webhooks",
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+
+  it("does not treat an error name alone as a delivery timeout", async () => {
+    const controller = new AbortController();
+    vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    const error = new DOMException("An unrelated timeout", "TimeoutError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(error));
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    await expect(client.deliver(event)).rejects.toMatchObject({
+      reason: "network",
+      cause: error,
+    });
+    expect(controller.signal.aborted).toBe(false);
+  });
+});
+
+describe("delivery errors", () => {
+  it("uses an unknown reason for an unclassified delivery error", () => {
+    expect(new DeliveryError("Delivery failed")).toMatchObject({
+      name: "DeliveryError",
+      reason: "unknown",
     });
   });
 });
