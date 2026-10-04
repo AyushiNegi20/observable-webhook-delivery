@@ -67,6 +67,38 @@ describe("HTTP delivery client", () => {
     await expect(client.deliver(event)).resolves.toBeUndefined();
   });
 
+  it.each([200, 503])("releases an unused response body for status %i", async (status) => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }), { status });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    if (status === 200) {
+      await expect(client.deliver(event)).resolves.toBeUndefined();
+    } else {
+      await expect(client.deliver(event)).rejects.toThrow(
+        "Webhook destination responded with status 503",
+      );
+    }
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it.each([200, 503])("preserves status %i when response cleanup fails", async (status) => {
+    const cancel = vi.fn().mockRejectedValue(new Error("Response stream closed"));
+    const response = new Response(new ReadableStream({ cancel }), { status });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+    if (status === 200) {
+      await expect(client.deliver(event)).resolves.toBeUndefined();
+    } else {
+      await expect(client.deliver(event)).rejects.toThrow(
+        "Webhook destination responded with status 503",
+      );
+    }
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("wraps network failures as delivery errors", async () => {
     const networkError = new Error("Connection refused");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(networkError));

@@ -48,6 +48,10 @@ export class HttpDeliveryClient implements DeliveryClient {
       });
     }
 
+    await response.body?.cancel().catch(() => {
+      // Cleanup must not override the delivery result from the HTTP status.
+    });
+
     if (!response.ok) {
       throw new DeliveryError(
         `Webhook destination responded with status ${response.status}`,

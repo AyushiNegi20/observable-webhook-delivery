@@ -117,6 +117,10 @@ Webhook redirects are disabled so payloads are only sent to the configured
 destination. URL fragments are rejected because they are not transmitted in HTTP
 requests.
 
+Unused receiver response bodies are cancelled after the response headers arrive.
+The service does not parse or log those bodies, and cleanup failures do not change
+the delivery result determined by the HTTP status.
+
 ## OpenTelemetry output
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
