@@ -181,6 +181,12 @@ Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 `success` or `failure`. The duration histogram uses the same attribute, so traces
 and delivery timing measurements can be filtered by the same outcome.
 
+Failed delivery spans and the failure counter include
+`webhook.delivery.failure_reason`: `timeout`, `network`, `http_status`, `unknown`,
+or `unexpected`. The last category covers errors outside `DeliveryError`. These
+fixed categories let you group failures without putting exception messages into
+metric labels. Successful delivery spans do not include a failure reason.
+
 Telemetry shutdown runs once. Concurrent shutdown requests wait for the same
 exporter flush, and all callers receive the same completion result. A failed
 shutdown remains visible to later callers instead of being reported as successful.

@@ -11,6 +11,8 @@ import {
   type UpDownCounter,
 } from "@opentelemetry/api";
 
+import { DeliveryError } from "./delivery.js";
+
 const instrumentationName = "observable-webhook-delivery";
 
 export interface DeliveryTelemetry {
@@ -74,7 +76,12 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
           return await operation();
         } catch (error) {
           result = "failure";
-          this.failures.add(1, attributes);
+          const failureReason = error instanceof DeliveryError ? error.reason : "unexpected";
+          span.setAttribute("webhook.delivery.failure_reason", failureReason);
+          this.failures.add(1, {
+            ...attributes,
+            "webhook.delivery.failure_reason": failureReason,
+          });
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: error instanceof Error ? error.message : "Webhook delivery failed",
