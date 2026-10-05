@@ -191,6 +191,10 @@ or `unexpected`. The last category covers errors outside `DeliveryError`. These
 fixed categories let you group failures without putting exception messages into
 metric labels. Successful delivery spans do not include a failure reason.
 
+Failed delivery spans also include `http.response.status_code` when the receiver
+returned an HTTP response. Timeouts and network failures omit this attribute.
+The receiver status is not added to metric labels.
+
 Telemetry shutdown runs once. Concurrent shutdown requests wait for the same
 exporter flush, and all callers receive the same completion result. A failed
 shutdown remains visible to later callers instead of being reported as successful.

@@ -78,6 +78,9 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
           result = "failure";
           const failureReason = error instanceof DeliveryError ? error.reason : "unexpected";
           span.setAttribute("webhook.delivery.failure_reason", failureReason);
+          if (error instanceof DeliveryError && error.statusCode !== undefined) {
+            span.setAttribute("http.response.status_code", error.statusCode);
+          }
           this.failures.add(1, {
             ...attributes,
             "webhook.delivery.failure_reason": failureReason,

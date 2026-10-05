@@ -51,7 +51,11 @@ describe("delivery failure telemetry", () => {
       .find((metric) => metric.descriptor.name === "webhook.delivery.failures");
   }
 
-  async function expectFailure(error: unknown, reason: string): Promise<void> {
+  async function expectFailure(
+    error: unknown,
+    reason: string,
+    statusCode?: number,
+  ): Promise<void> {
     await expect(
       telemetry.trackDelivery("invoice.created", async () => {
         throw error;
@@ -66,6 +70,7 @@ describe("delivery failure telemetry", () => {
       "webhook.delivery.result": "failure",
       "webhook.delivery.failure_reason": reason,
     });
+    expect(spans[0]?.attributes["http.response.status_code"]).toBe(statusCode);
 
     const failures = await failureMetric();
     expect(failures?.dataPointType).toBe(DataPointType.SUM);
@@ -88,6 +93,18 @@ describe("delivery failure telemetry", () => {
     },
   );
 
+  it.each([400, 429, 500, 503])(
+    "records HTTP status %i on the span without changing metric labels",
+    async (statusCode) => {
+      const error = new DeliveryError("Receiver rejected the delivery", {
+        reason: "http_status",
+        statusCode,
+      });
+
+      await expectFailure(error, "http_status", statusCode);
+    },
+  );
+
   it.each([new Error("Unexpected failure"), "Unexpected rejection"])(
     "uses a bounded label for unexpected errors: %s",
     async (error) => {
@@ -105,6 +122,7 @@ describe("delivery failure telemetry", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0]?.attributes["webhook.delivery.result"]).toBe("success");
     expect(spans[0]?.attributes["webhook.delivery.failure_reason"]).toBeUndefined();
+    expect(spans[0]?.attributes["http.response.status_code"]).toBeUndefined();
     const failures = await failureMetric();
     expect(failures?.dataPoints ?? []).toHaveLength(0);
   });
