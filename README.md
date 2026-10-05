@@ -216,6 +216,11 @@ Trace-context tests check parent-child relationships across asynchronous work,
 parent-context restoration after success or failure, and log identifier isolation
 between concurrent deliveries.
 
+HTTP integration tests start a temporary receiver on the loopback interface and
+use real requests to check successful responses, no-content responses, receiver
+errors, and delivery timeouts together with their custom spans. They do not need
+external services.
+
 ## Run with Docker
 
 ```bash
