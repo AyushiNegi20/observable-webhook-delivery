@@ -46,17 +46,18 @@ describe("HTTP delivery client", () => {
     );
   });
 
-  it("reports unsuccessful responses", async () => {
+  it.each([400, 429, 500, 503])("preserves unsuccessful HTTP status %i", async (status) => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 503 })),
+      vi.fn().mockResolvedValue(new Response(null, { status })),
     );
     const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
 
     await expect(client.deliver(event)).rejects.toMatchObject({
       name: "DeliveryError",
-      message: "Webhook destination responded with status 503",
+      message: `Webhook destination responded with status ${status}`,
       reason: "http_status",
+      statusCode: status,
     });
   });
 
@@ -111,6 +112,7 @@ describe("HTTP delivery client", () => {
       name: "DeliveryError",
       message: "Webhook destination could not be reached",
       reason: "network",
+      statusCode: undefined,
       cause: networkError,
     });
   });
@@ -130,6 +132,7 @@ describe("HTTP delivery client", () => {
       name: "DeliveryError",
       message: "Webhook destination timed out after 1000 ms",
       reason: "timeout",
+      statusCode: undefined,
       cause: timeoutError,
     });
     expect(timeout).toHaveBeenCalledWith(1000);

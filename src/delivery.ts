@@ -13,14 +13,19 @@ export type DeliveryFailureReason = "network" | "timeout" | "http_status" | "unk
 
 export class DeliveryError extends Error {
   readonly reason: DeliveryFailureReason;
+  readonly statusCode: number | undefined;
 
   constructor(
     message: string,
-    options?: ErrorOptions & { reason?: DeliveryFailureReason },
+    options?: ErrorOptions & {
+      reason?: DeliveryFailureReason;
+      statusCode?: number;
+    },
   ) {
     super(message, options);
     this.name = "DeliveryError";
     this.reason = options?.reason ?? "unknown";
+    this.statusCode = options?.statusCode;
   }
 }
 
@@ -67,7 +72,7 @@ export class HttpDeliveryClient implements DeliveryClient {
     if (!response.ok) {
       throw new DeliveryError(
         `Webhook destination responded with status ${response.status}`,
-        { reason: "http_status" },
+        { reason: "http_status", statusCode: response.status },
       );
     }
   }

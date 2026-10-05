@@ -112,6 +112,10 @@ Delivery errors distinguish an expired deadline (`timeout`), a transport failure
 delivery errors use `unknown`. The public API keeps its generic `502` response;
 the reason is available on the internal error for troubleshooting.
 
+HTTP response failures also preserve the receiver's numeric `statusCode` on the
+internal error. Network failures and timeouts leave it undefined because no HTTP
+response status was received.
+
 Keep API keys and credentials in local environment files, never in committed source code. Files matching `.env.*` are ignored, while `.env.example` remains available as a safe configuration template.
 
 Credentials embedded directly in `DELIVERY_TARGET_URL` are rejected because URLs
