@@ -78,6 +78,13 @@ status and application version.
 API responses use `Cache-Control: no-store` so clients and operational checks
 always receive current results.
 
+Every request gets a server-generated UUID, returned in `x-request-id` and used
+as `reqId` in request logs. This avoids restarting the same request ID sequence
+when a process restarts or another instance starts. Incoming `x-request-id`
+headers are ignored. Error responses also include the generated ID so a failed
+request can be found in the logs. Request IDs are separate from trace IDs and
+are not metric labels.
+
 ### Mock receiver
 
 ```http

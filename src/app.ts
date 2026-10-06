@@ -61,6 +61,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       },
     },
     bodyLimit: 256 * 1024,
+    genReqId: () => randomUUID(),
+    requestIdHeader: false,
     logger: options.logger ?? true,
   });
   const deliveryTelemetry =
