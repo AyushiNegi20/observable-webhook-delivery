@@ -56,6 +56,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const app = Fastify({
     ajv: {
       customOptions: {
+        coerceTypes: false,
         removeAdditional: false,
       },
     },

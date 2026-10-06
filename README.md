@@ -60,6 +60,12 @@ A successful delivery returns:
 }
 ```
 
+Request fields are validated without type conversion. `eventType` must be a
+string and `data` must be a JSON object; numbers, booleans, or arrays are not
+converted to fit those fields. Values inside `data` can still contain nested
+objects, arrays, numbers, booleans, strings, and null. The mock receiver applies
+the same rules and requires string values for `id` and `createdAt`.
+
 ### Health check
 
 ```http
