@@ -139,6 +139,12 @@ Webhook redirects are disabled so payloads are only sent to the configured
 destination. URL fragments are rejected because they are not transmitted in HTTP
 requests.
 
+A blocked redirect currently appears as a `network` delivery failure without a
+receiver status code because `fetch` rejects it before exposing the response.
+HTTP integration tests cover 301, 302, 303, 307, and 308 redirects with both
+relative and absolute locations, checking that the redirect target receives no
+request.
+
 Unused receiver response bodies are cancelled after the response headers arrive.
 The service does not parse or log those bodies, and cleanup failures do not change
 the delivery result determined by the HTTP status.

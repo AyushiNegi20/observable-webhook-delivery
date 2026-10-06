@@ -18,6 +18,11 @@ const event: WebhookEvent = {
   createdAt: "2026-08-25T00:00:00.000Z",
 };
 
+const redirectCases = [301, 302, 303, 307, 308].flatMap((statusCode) => [
+  { statusCode, locationType: "relative" },
+  { statusCode, locationType: "absolute" },
+]);
+
 interface ReceivedRequest {
   method: string | undefined;
   path: string | undefined;
@@ -56,6 +61,20 @@ describe("delivery over real HTTP", () => {
 
         if (request.url === "/slow") {
           // Leave the response pending so the real delivery deadline expires.
+          return;
+        }
+
+        const redirect = redirectCases.find(
+          ({ statusCode, locationType }) =>
+            request.url === `/redirect/${statusCode}/${locationType}`,
+        );
+        if (redirect !== undefined) {
+          response.writeHead(redirect.statusCode, {
+            location: redirect.locationType === "relative"
+              ? "/accepted"
+              : `${baseUrl}/accepted`,
+          });
+          response.end();
           return;
         }
 
@@ -158,6 +177,23 @@ describe("delivery over real HTTP", () => {
     expectRequest("/unavailable");
     await expectSpan("failure", "http_status", 503);
   }, 15_000);
+
+  it.each(redirectCases)(
+    "blocks a $statusCode redirect with a $locationType location without forwarding the event",
+    async ({ statusCode, locationType }) => {
+      const path = `/redirect/${statusCode}/${locationType}`;
+
+      await expect(deliver(path)).rejects.toMatchObject({
+        name: "DeliveryError",
+        reason: "network",
+        statusCode: undefined,
+      });
+      // Only the configured endpoint may receive a request, never /accepted.
+      expectRequest(path);
+      await expectSpan("failure", "network");
+    },
+    15_000,
+  );
 
   it("ends the span when the receiver never responds", async () => {
     await expect(deliver("/slow", 1000)).rejects.toMatchObject({
