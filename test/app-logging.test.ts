@@ -65,4 +65,50 @@ describe("application logging", () => {
       });
     }
   }, 15_000);
+
+  it.each([
+    { statusCode: 200, received: true },
+    { statusCode: 204, received: true },
+    { statusCode: 299, received: true },
+    { statusCode: 300, received: false },
+    { statusCode: 400, received: false },
+    { statusCode: 429, received: false },
+    { statusCode: 503, received: false },
+    { statusCode: 599, received: false },
+  ])("logs the mock receiver outcome for status $statusCode", async ({ statusCode, received }) => {
+    app = buildApp({
+      deliveryClient: { deliver: async () => {} },
+      logger: captured.logger,
+      mockReceiverStatusCode: statusCode,
+    });
+    const eventId = "a545a04d-5380-4d9c-bca8-37f20936e942";
+    const payloadMarker = "mock-payload-not-for-logs";
+    const response = await app.inject({
+      method: "POST",
+      url: "/mock/webhooks",
+      payload: {
+        id: eventId,
+        eventType: "invoice.created",
+        data: { note: payloadMarker },
+        createdAt: "2026-08-25T00:00:00.000Z",
+      },
+    });
+    const receiverLogs = captured.records.filter((record) => record.eventId === eventId);
+
+    expect(response.statusCode).toBe(statusCode);
+    if (statusCode !== 204) {
+      expect(response.json()).toEqual({ received });
+    }
+    expect(receiverLogs).toHaveLength(1);
+    expect(receiverLogs[0]).toMatchObject({
+      level: received ? 30 : 40,
+      msg: received ? "Mock receiver accepted webhook" : "Mock receiver rejected webhook",
+      reqId: response.headers["x-request-id"],
+      eventId,
+      eventType: "invoice.created",
+      statusCode,
+      received,
+    });
+    expect(JSON.stringify(captured.records)).not.toContain(payloadMarker);
+  }, 15_000);
 });

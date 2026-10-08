@@ -204,6 +204,11 @@ MOCK_RECEIVER_STATUS_CODE=503
 
 The `/events` endpoint will return `502`, the delivery span will have an error status, and the failure counter will increase.
 
+The mock receiver logs successful 2xx responses at info level and rejected
+deliveries at warning level. Its log includes `statusCode` and `received`, along
+with the event and request identifiers, so a simulated 503 is not reported as
+an accepted webhook. The event payload is not included.
+
 Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 `success` or `failure`. The duration histogram uses the same attribute, so traces
 and delivery timing measurements can be filtered by the same outcome.

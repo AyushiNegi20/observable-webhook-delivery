@@ -91,18 +91,23 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       },
     },
     async (request, reply) => {
-      request.log.info(
-        {
-          ...activeTraceFields(),
-          eventId: request.body.id,
-          eventType: request.body.eventType,
-        },
-        "Mock receiver accepted webhook",
-      );
+      const received = mockReceiverStatusCode >= 200 && mockReceiverStatusCode < 300;
+      const logFields = {
+        ...activeTraceFields(),
+        eventId: request.body.id,
+        eventType: request.body.eventType,
+        statusCode: mockReceiverStatusCode,
+        received,
+      };
+
+      if (received) {
+        request.log.info(logFields, "Mock receiver accepted webhook");
+      } else {
+        request.log.warn(logFields, "Mock receiver rejected webhook");
+      }
 
       return reply.code(mockReceiverStatusCode).send({
-        received:
-          mockReceiverStatusCode >= 200 && mockReceiverStatusCode < 300,
+        received,
       });
     },
   );
