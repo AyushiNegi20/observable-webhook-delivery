@@ -244,6 +244,11 @@ Trace-context tests check parent-child relationships across asynchronous work,
 parent-context restoration after success or failure, and log identifier isolation
 between concurrent deliveries.
 
+Log-correlation tests submit successful and failed events through the API and
+match the captured delivery logs to exported spans. They verify request and
+event identifiers, log levels, and the absence of synthetic payload and
+authorization-header markers in those logs and custom spans.
+
 HTTP integration tests start a temporary receiver on the loopback interface and
 use real requests to check successful responses, no-content responses, receiver
 errors, and delivery timeouts together with their custom spans. They do not need
