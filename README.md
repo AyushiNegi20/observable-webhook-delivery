@@ -192,6 +192,10 @@ valid. Missing or invalid contexts are omitted instead of logging all-zero IDs.
 Valid IDs are retained even when the trace is not sampled. Event payloads are not
 added to telemetry.
 
+When using `buildApp` directly, its `logger` option accepts a compatible logger
+instance as well as `true` or `false`. A supplied logger retains its bindings and
+receives both request logs and delivery logs. Omitting it enables JSON logging.
+
 To simulate an unavailable destination, restart the application with:
 
 ```text
