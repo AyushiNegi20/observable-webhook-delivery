@@ -227,6 +227,10 @@ Telemetry shutdown runs once. Concurrent shutdown requests wait for the same
 exporter flush, and all callers receive the same completion result. A failed
 shutdown remains visible to later callers instead of being reported as successful.
 
+On shutdown, server cleanup finishes before the telemetry flush begins. The flush
+is still attempted if server cleanup throws, and failures from both steps are
+preserved if both fail. A cleanup failure makes the process exit unsuccessfully.
+
 ## Commands
 
 ```bash
