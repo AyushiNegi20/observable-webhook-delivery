@@ -39,4 +39,10 @@ try {
 } catch (error) {
   app.log.error(error, "Server failed to start");
   process.exitCode = 1;
+
+  try {
+    await shutdownResources(() => app.close(), shutdownTelemetry);
+  } catch (cleanupError) {
+    app.log.error(cleanupError, "Startup cleanup failed");
+  }
 }

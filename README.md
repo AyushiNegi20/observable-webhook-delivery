@@ -231,6 +231,10 @@ On shutdown, server cleanup finishes before the telemetry flush begins. The flus
 is still attempted if server cleanup throws, and failures from both steps are
 preserved if both fail. A cleanup failure makes the process exit unsuccessfully.
 
+If the server cannot start listening, it logs the startup error, closes the
+application, and flushes telemetry before exiting with a failure status. Any
+cleanup error is logged separately so the original startup failure stays visible.
+
 ## Commands
 
 ```bash
