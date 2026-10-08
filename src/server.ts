@@ -14,10 +14,23 @@ const app = buildApp({
   mockReceiverStatusCode: config.mockReceiverStatusCode,
 });
 
+let resourceShutdown: Promise<void> | undefined;
+let shutdownStarted = false;
+
+function stopResources(): Promise<void> {
+  resourceShutdown ??= shutdownResources(() => app.close(), shutdownTelemetry);
+  return resourceShutdown;
+}
+
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownStarted) {
+    return;
+  }
+  shutdownStarted = true;
+
   try {
     app.log.info({ signal }, "Server shutdown started");
-    await shutdownResources(() => app.close(), shutdownTelemetry);
+    await stopResources();
   } catch (error) {
     app.log.error(error, "Server shutdown failed");
     process.exitCode = 1;
@@ -41,7 +54,7 @@ try {
   process.exitCode = 1;
 
   try {
-    await shutdownResources(() => app.close(), shutdownTelemetry);
+    await stopResources();
   } catch (cleanupError) {
     app.log.error(cleanupError, "Startup cleanup failed");
   }

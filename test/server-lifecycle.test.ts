@@ -25,6 +25,22 @@ const signals = ["SIGINT", "SIGTERM"] as const;
 const originalListeners = new Map<NodeJS.Signals, NodeJS.SignalsListener[]>();
 let originalExitCode: typeof process.exitCode;
 
+function pendingStep() {
+  let finish!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  return { promise, finish };
+}
+
+function invokeSignalHandler(signal: (typeof signals)[number]): void {
+  const listeners = process.listeners(signal).filter(
+    (listener) => !originalListeners.get(signal)?.includes(listener),
+  );
+  expect(listeners).toHaveLength(1);
+  listeners[0]?.(signal);
+}
+
 beforeEach(() => {
   vi.resetModules();
   server.listen.mockReset().mockResolvedValue("http://127.0.0.1:3000");
@@ -101,4 +117,79 @@ describe("server startup cleanup", () => {
     },
     15_000,
   );
+});
+
+describe("shutdown signals", () => {
+  it("runs cleanup once and waits for the flush when both signals arrive", async () => {
+    const closing = pendingStep();
+    const flushing = pendingStep();
+    server.close.mockReturnValue(closing.promise);
+    server.flush.mockReturnValue(flushing.promise);
+    await import("../src/server.js");
+
+    invokeSignalHandler("SIGTERM");
+    invokeSignalHandler("SIGINT");
+    try {
+      expect(server.close).toHaveBeenCalledOnce();
+      expect(server.flush).not.toHaveBeenCalled();
+      expect(server.exit).not.toHaveBeenCalled();
+      closing.finish();
+      await vi.waitFor(() => expect(server.flush).toHaveBeenCalledOnce());
+      expect(server.exit).not.toHaveBeenCalled();
+
+      flushing.finish();
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalledExactlyOnceWith(0));
+      expect(server.log.info).toHaveBeenCalledExactlyOnceWith(
+        { signal: "SIGTERM" }, "Server shutdown started",
+      );
+    } finally {
+      closing.finish();
+      flushing.finish();
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalled());
+    }
+  }, 15_000);
+
+  it.each(["server", "telemetry"] as const)(
+    "does not repeat failed %s cleanup for a later signal",
+    async (step) => {
+      const failure = new Error("Shutdown failed");
+      (step === "server" ? server.close : server.flush).mockRejectedValue(failure);
+      await import("../src/server.js");
+
+      invokeSignalHandler("SIGINT");
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalledWith(1));
+      invokeSignalHandler("SIGTERM");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(server.close).toHaveBeenCalledOnce();
+      expect(server.flush).toHaveBeenCalledOnce();
+      expect(server.exit).toHaveBeenCalledExactlyOnceWith(1);
+      expect(server.log.error).toHaveBeenCalledExactlyOnceWith(failure, "Server shutdown failed");
+    },
+    15_000,
+  );
+
+  it("shares cleanup with a failed startup when a signal arrives", async () => {
+    const closing = pendingStep();
+    server.listen.mockRejectedValue(new Error("Address already in use"));
+    server.close.mockReturnValue(closing.promise);
+    const starting = import("../src/server.js");
+
+    try {
+      await vi.waitFor(() => expect(server.close).toHaveBeenCalledOnce());
+      invokeSignalHandler("SIGTERM");
+      expect(server.close).toHaveBeenCalledOnce();
+      expect(server.exit).not.toHaveBeenCalled();
+
+      closing.finish();
+      await starting;
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalledExactlyOnceWith(1));
+      expect(server.flush).toHaveBeenCalledOnce();
+      expect(process.exitCode).toBe(1);
+    } finally {
+      closing.finish();
+      await starting;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  }, 15_000);
 });

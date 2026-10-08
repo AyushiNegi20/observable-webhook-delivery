@@ -235,6 +235,11 @@ If the server cannot start listening, it logs the startup error, closes the
 application, and flushes telemetry before exiting with a failure status. Any
 cleanup error is logged separately so the original startup failure stays visible.
 
+If both `SIGINT` and `SIGTERM` arrive, cleanup and process exit still run only
+once. Signal handling and failed-startup cleanup share the same resource shutdown
+operation. The process waits for that operation before exiting, including when
+telemetry flushing fails.
+
 ## Commands
 
 ```bash
