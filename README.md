@@ -260,6 +260,10 @@ pnpm verify
 
 Run `pnpm verify` before pushing to execute the complete local validation suite.
 
+Environment startup tests use fresh Node processes and temporary directories to
+check missing files, file-based settings, and process-variable precedence. They
+do not read or change your local `.env` file.
+
 Trace-context tests check parent-child relationships across asynchronous work,
 parent-context restoration after success or failure, and log identifier isolation
 between concurrent deliveries.
