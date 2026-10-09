@@ -116,7 +116,11 @@ pnpm dev
 
 The API listens on `http://localhost:3000` by default.
 
-Copy `.env.example` to `.env` to change the host, port, delivery target, timeout, mock receiver status, or telemetry settings. Environment variables can also be supplied directly to the process.
+Copy `.env.example` to `.env` to change the host, port, delivery target, timeout,
+mock receiver status, or telemetry settings. Startup loads `.env` from the working
+directory before configuring OpenTelemetry. Variables already set in the process
+take precedence over the file. A missing `.env` is allowed; other file-reading
+errors stop startup instead of silently ignoring configuration.
 
 Delivery timeouts must be positive and cannot exceed 60 seconds.
 

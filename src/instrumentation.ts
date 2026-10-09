@@ -1,3 +1,5 @@
+import "./environment.js";
+
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { resourceFromAttributes } from "@opentelemetry/resources";

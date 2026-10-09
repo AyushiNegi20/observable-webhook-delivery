@@ -7,6 +7,10 @@ const sdk = vi.hoisted(() => ({
   shutdown: vi.fn<() => Promise<void>>(),
 }));
 
+const environment = vi.hoisted(() => ({ load: vi.fn<() => void>() }));
+
+vi.mock("node:process", () => ({ loadEnvFile: environment.load }));
+
 vi.mock("@opentelemetry/sdk-node", () => ({
   NodeSDK: class {
     constructor(options: Partial<NodeSDKConfiguration>) {
@@ -28,6 +32,7 @@ vi.mock("@opentelemetry/instrumentation-undici", () => ({
 
 beforeEach(() => {
   vi.resetModules();
+  environment.load.mockReset();
   sdk.configure.mockReset();
   sdk.start.mockReset();
   sdk.shutdown.mockReset().mockResolvedValue(undefined);
@@ -40,6 +45,18 @@ afterEach(() => {
 });
 
 describe("telemetry service name", () => {
+  it("loads local settings before configuring telemetry", async () => {
+    environment.load.mockImplementation(() => {
+      vi.stubEnv("OTEL_SERVICE_NAME", "local-webhook-api");
+    });
+
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+
+    expect(environment.load).toHaveBeenCalledOnce();
+    expect(sdk.configure.mock.calls[0]?.[0].serviceName).toBe("local-webhook-api");
+    await shutdownTelemetry();
+  }, 15_000);
+
   it.each(["", "   ", "\t\n"])(
     "rejects a blank service name: %j",
     async (value) => {
