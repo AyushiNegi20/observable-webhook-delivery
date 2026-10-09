@@ -122,6 +122,9 @@ directory before configuring OpenTelemetry. Variables already set in the process
 take precedence over the file. A missing `.env` is allowed; other file-reading
 errors stop startup instead of silently ignoring configuration.
 
+`HOST` defaults to `0.0.0.0`. Surrounding whitespace is trimmed before the server
+binds, and an empty or whitespace-only value is rejected.
+
 Delivery timeouts must be positive and cannot exceed 60 seconds.
 
 Delivery errors distinguish an expired deadline (`timeout`), a transport failure

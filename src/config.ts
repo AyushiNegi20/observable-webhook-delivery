@@ -44,11 +44,12 @@ function readHost(value: string | undefined): string {
     return "0.0.0.0";
   }
 
-  if (value.trim() === "") {
+  const host = value.trim();
+  if (host === "") {
     throw new Error("Expected HOST to be a non-empty value");
   }
 
-  return value;
+  return host;
 }
 
 function readHttpStatus(value: string | undefined, fallback: number): number {

@@ -31,10 +31,19 @@ describe("application configuration", () => {
     );
   });
 
-  it("rejects an empty host", () => {
-    expect(() => loadConfig({ HOST: "   " })).toThrow(
+  it.each(["", "   ", "\t\n"])("rejects an empty host: %j", (host) => {
+    expect(() => loadConfig({ HOST: host })).toThrow(
       "Expected HOST to be a non-empty value",
     );
+  });
+
+  it.each([
+    { value: " 127.0.0.1 ", expected: "127.0.0.1" },
+    { value: "\tlocalhost\n", expected: "localhost" },
+    { value: " ::1 ", expected: "::1" },
+    { value: "0.0.0.0", expected: "0.0.0.0" },
+  ])("normalizes host $value to $expected", ({ value, expected }) => {
+    expect(loadConfig({ HOST: value }).host).toBe(expected);
   });
 
   it("rejects a non-HTTP delivery target", () => {
