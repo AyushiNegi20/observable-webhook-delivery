@@ -2,6 +2,7 @@ export interface AppConfig {
   deliveryTargetUrl: string;
   deliveryTimeoutMs: number;
   host: string;
+  mockReceiverDelayMs: number;
   mockReceiverStatusCode: number;
   port: number;
 }
@@ -65,6 +66,19 @@ function readHttpStatus(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function readMockReceiverDelay(value: string | undefined): number {
+  if (value === undefined) {
+    return 0;
+  }
+
+  const parsed = Number(value);
+  if (value.trim() === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 60_000) {
+    throw new Error("Expected MOCK_RECEIVER_DELAY_MS to be an integer between 0 and 60000");
+  }
+
+  return parsed;
+}
+
 function readHttpUrl(value: string): string {
   let parsed: URL;
 
@@ -100,6 +114,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     port,
     deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
     deliveryTimeoutMs: readDeliveryTimeout(environment.DELIVERY_TIMEOUT_MS),
+    mockReceiverDelayMs: readMockReceiverDelay(environment.MOCK_RECEIVER_DELAY_MS),
     mockReceiverStatusCode: readHttpStatus(
       environment.MOCK_RECEIVER_STATUS_CODE,
       200,

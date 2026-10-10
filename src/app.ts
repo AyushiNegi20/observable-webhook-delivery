@@ -16,6 +16,7 @@ interface EventRequestBody {
 interface BuildAppOptions {
   deliveryClient: DeliveryClient;
   logger?: boolean | FastifyBaseLogger;
+  mockReceiverDelayMs?: number;
   mockReceiverStatusCode?: number;
   telemetry?: DeliveryTelemetry;
 }
@@ -70,6 +71,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const deliveryTelemetry =
     options.telemetry ?? new OpenTelemetryDeliveryTelemetry();
   const mockReceiverStatusCode = options.mockReceiverStatusCode ?? 200;
+  const mockReceiverDelayMs = options.mockReceiverDelayMs ?? 0;
 
   app.addHook("onSend", async (request, reply) => {
     reply.header("cache-control", "no-store");
@@ -91,6 +93,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       },
     },
     async (request, reply) => {
+      if (mockReceiverDelayMs > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, mockReceiverDelayMs));
+      }
       const received = mockReceiverStatusCode >= 200 && mockReceiverStatusCode < 300;
       const logFields = {
         ...activeTraceFields(),

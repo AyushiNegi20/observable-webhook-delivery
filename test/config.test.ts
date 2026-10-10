@@ -10,6 +10,7 @@ describe("application configuration", () => {
       deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
       deliveryTimeoutMs: 3000,
       mockReceiverStatusCode: 200,
+      mockReceiverDelayMs: 0,
     });
   });
 
@@ -81,4 +82,17 @@ describe("application configuration", () => {
       "Expected an HTTP status from 200 to 599",
     );
   });
+
+  it.each(["0", "250", "60000"])("loads mock receiver delay %s", (value) => {
+    expect(loadConfig({ MOCK_RECEIVER_DELAY_MS: value }).mockReceiverDelayMs).toBe(Number(value));
+  });
+
+  it.each(["", " ", "-1", "1.5", "60001", "NaN", "Infinity", "slow"])(
+    "rejects invalid mock receiver delay %j",
+    (value) => {
+      expect(() => loadConfig({ MOCK_RECEIVER_DELAY_MS: value })).toThrow(
+        "Expected MOCK_RECEIVER_DELAY_MS to be an integer between 0 and 60000",
+      );
+    },
+  );
 });

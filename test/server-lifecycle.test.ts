@@ -16,6 +16,7 @@ vi.mock("../src/config.js", () => ({
     deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
     deliveryTimeoutMs: 3000,
     mockReceiverStatusCode: 200,
+    mockReceiverDelayMs: 0,
   }),
 }));
 vi.mock("../src/delivery.js", () => ({ HttpDeliveryClient: class {} }));

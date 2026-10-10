@@ -11,6 +11,7 @@ const deliveryClient = new HttpDeliveryClient(
 );
 const app = buildApp({
   deliveryClient,
+  mockReceiverDelayMs: config.mockReceiverDelayMs,
   mockReceiverStatusCode: config.mockReceiverStatusCode,
 });
 

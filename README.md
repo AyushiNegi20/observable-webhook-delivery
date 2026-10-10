@@ -211,6 +211,13 @@ MOCK_RECEIVER_STATUS_CODE=503
 
 The `/events` endpoint will return `502`, the delivery span will have an error status, and the failure counter will increase.
 
+To simulate a slow receiver, set `MOCK_RECEIVER_DELAY_MS` in `.env` and restart.
+It defaults to `0` and accepts whole numbers from `0` to `60000` milliseconds.
+For example, `MOCK_RECEIVER_DELAY_MS=1000` adds a one-second delay before the mock
+receiver responds. A delay above `DELIVERY_TIMEOUT_MS` lets you practice a timeout
+incident. This setting affects only the mock receiver, not health checks or an
+external delivery destination.
+
 The mock receiver logs successful 2xx responses at info level and rejected
 deliveries at warning level. Its log includes `statusCode` and `received`, along
 with the event and request identifiers, so a simulated 503 is not reported as

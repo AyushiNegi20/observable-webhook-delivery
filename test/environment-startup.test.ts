@@ -18,12 +18,14 @@ const configUrl = new URL("../src/config.ts", import.meta.url).href;
 const outputPrefix = "STARTUP_CONFIG=";
 const appVariables = [
   "HOST", "PORT", "DELIVERY_TARGET_URL", "DELIVERY_TIMEOUT_MS", "MOCK_RECEIVER_STATUS_CODE",
+  "MOCK_RECEIVER_DELAY_MS",
 ];
 const localSettings = [
   'HOST=" 127.0.0.1 "',
   "PORT=3100",
   "DELIVERY_TIMEOUT_MS=1250",
   "MOCK_RECEIVER_STATUS_CODE=503",
+  "MOCK_RECEIVER_DELAY_MS=250",
   "OTEL_SERVICE_NAME=local-test-api",
   "OTEL_METRIC_EXPORT_INTERVAL_MS=60000",
 ].join("\n");
@@ -84,6 +86,7 @@ describe("environment settings in a fresh process", () => {
         deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
         deliveryTimeoutMs: 3000,
         mockReceiverStatusCode: 200,
+        mockReceiverDelayMs: 0,
       },
     });
   }, 40_000);
@@ -98,6 +101,7 @@ describe("environment settings in a fresh process", () => {
         deliveryTargetUrl: "http://127.0.0.1:3100/mock/webhooks",
         deliveryTimeoutMs: 1250,
         mockReceiverStatusCode: 503,
+        mockReceiverDelayMs: 250,
       },
       serviceName: "local-test-api",
       metricInterval: "60000",
