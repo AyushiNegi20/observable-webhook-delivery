@@ -223,6 +223,10 @@ deliveries at warning level. Its log includes `statusCode` and `received`, along
 with the event and request identifiers, so a simulated 503 is not reported as
 an accepted webhook. The event payload is not included.
 
+Receiver logs also include `delayMs`, the configured simulated delay. This is
+not a measurement of total request time; use delivery spans and the duration
+histogram to investigate observed latency. The delay is not a metric label.
+
 Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 `success` or `failure`. The duration histogram uses the same attribute, so traces
 and delivery timing measurements can be filtered by the same outcome.

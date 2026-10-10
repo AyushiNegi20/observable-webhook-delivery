@@ -102,6 +102,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         eventId: request.body.id,
         eventType: request.body.eventType,
         statusCode: mockReceiverStatusCode,
+        delayMs: mockReceiverDelayMs,
         received,
       };
 

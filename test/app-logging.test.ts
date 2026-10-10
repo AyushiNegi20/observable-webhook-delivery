@@ -67,19 +67,22 @@ describe("application logging", () => {
   }, 15_000);
 
   it.each([
-    { statusCode: 200, received: true },
-    { statusCode: 204, received: true },
-    { statusCode: 299, received: true },
-    { statusCode: 300, received: false },
-    { statusCode: 400, received: false },
-    { statusCode: 429, received: false },
-    { statusCode: 503, received: false },
-    { statusCode: 599, received: false },
-  ])("logs the mock receiver outcome for status $statusCode", async ({ statusCode, received }) => {
+    { statusCode: 200, received: true, delayMs: 0 },
+    { statusCode: 204, received: true, delayMs: 0 },
+    { statusCode: 299, received: true, delayMs: 0 },
+    { statusCode: 300, received: false, delayMs: 0 },
+    { statusCode: 400, received: false, delayMs: 0 },
+    { statusCode: 429, received: false, delayMs: 0 },
+    { statusCode: 503, received: false, delayMs: 0 },
+    { statusCode: 599, received: false, delayMs: 0 },
+    { statusCode: 200, received: true, delayMs: 25 },
+    { statusCode: 503, received: false, delayMs: 25 },
+  ])("logs status $statusCode with configured delay $delayMs", async ({ statusCode, received, delayMs }) => {
     app = buildApp({
       deliveryClient: { deliver: async () => {} },
       logger: captured.logger,
       mockReceiverStatusCode: statusCode,
+      mockReceiverDelayMs: delayMs,
     });
     const eventId = "a545a04d-5380-4d9c-bca8-37f20936e942";
     const payloadMarker = "mock-payload-not-for-logs";
@@ -108,6 +111,7 @@ describe("application logging", () => {
       eventType: "invoice.created",
       statusCode,
       received,
+      delayMs,
     });
     expect(JSON.stringify(captured.records)).not.toContain(payloadMarker);
   }, 15_000);
