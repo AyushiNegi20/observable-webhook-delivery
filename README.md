@@ -227,6 +227,20 @@ Receiver logs also include `delayMs`, the configured simulated delay. This is
 not a measurement of total request time; use delivery spans and the duration
 histogram to investigate observed latency. The delay is not a metric label.
 
+A timeout exercise can use these `.env` values:
+
+```text
+MOCK_RECEIVER_STATUS_CODE=200
+MOCK_RECEIVER_DELAY_MS=4000
+DELIVERY_TIMEOUT_MS=3000
+```
+
+Restart the service and submit an event. The API returns `502`, and the delivery
+span reports `webhook.delivery.failure_reason=timeout`. The mock receiver can
+still log an accepted webhook later. A timeout means the sender stopped waiting,
+not that the receiver necessarily stopped processing. Slow-receiver integration
+tests cover this case and a delayed success using a real local HTTP connection.
+
 Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 `success` or `failure`. The duration histogram uses the same attribute, so traces
 and delivery timing measurements can be filtered by the same outcome.
