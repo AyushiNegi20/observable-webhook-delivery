@@ -12,6 +12,7 @@ import {
 } from "@opentelemetry/api";
 
 import { DeliveryError } from "./delivery.js";
+import { serviceVersion } from "./service-metadata.js";
 
 const instrumentationName = "observable-webhook-delivery";
 
@@ -26,8 +27,8 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
   private readonly duration: Histogram;
 
   constructor(
-    private readonly tracer: Tracer = trace.getTracer(instrumentationName),
-    meter: Meter = metrics.getMeter(instrumentationName),
+    private readonly tracer: Tracer = trace.getTracer(instrumentationName, serviceVersion),
+    meter: Meter = metrics.getMeter(instrumentationName, serviceVersion),
   ) {
     this.attempts = meter.createCounter("webhook.delivery.attempts", {
       description: "Number of webhook delivery attempts",

@@ -163,6 +163,12 @@ the delivery result determined by the HTTP status.
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
 
+Custom delivery spans and metrics use the `observable-webhook-delivery`
+instrumentation scope with the application version from `package.json`. The
+resource's `service.version` identifies the running application; the scope
+identifies the code that created those signals. Automatic HTTP instrumentation
+keeps its own library name and version.
+
 `OTEL_SERVICE_NAME` defaults to `webhook-api`. Surrounding whitespace is trimmed,
 and blank names are rejected at startup so telemetry always has a service name.
 
