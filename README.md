@@ -179,10 +179,18 @@ rejected at startup instead of being reduced to a one-millisecond interval.
 A delivery produces automatic HTTP spans and a custom business span:
 
 ```text
-POST /events
-└── webhook.deliver
-    └── POST /mock/webhooks
+POST /events (HTTP server)
+  webhook.deliver (custom)
+    POST /mock/webhooks (HTTP client)
+      POST /mock/webhooks (HTTP server)
 ```
+
+The incoming `traceparent` header connects the API request to a caller's trace.
+Outgoing delivery carries that context to the receiver, preserving the trace ID
+while each operation gets its own span ID. A valid `tracestate` also travels with
+the request. Missing or invalid trace headers start a new trace. With the default
+parent-based sampler, an unsampled caller's context still propagates and appears
+in logs, but its spans are not exported.
 
 The custom metrics are:
 
@@ -301,6 +309,12 @@ do not read or change your local `.env` file.
 Trace-context tests check parent-child relationships across asynchronous work,
 parent-context restoration after success or failure, and log identifier isolation
 between concurrent deliveries.
+
+HTTP propagation tests start the application's actual SDK in fresh Node processes
+and send requests through both HTTP hops. They check the four-span parent chain,
+trace-correlated logs, receiver failures, missing or invalid headers, and an
+unsampled parent. These tests capture spans in memory, use only loopback ports,
+and run from temporary directories without loading your local `.env` file.
 
 Log-correlation tests submit successful and failed events through the API and
 match the captured delivery logs to exported spans. They verify request and
