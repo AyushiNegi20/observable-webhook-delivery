@@ -11,6 +11,8 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 
+import { serviceVersion } from "./service-metadata.js";
+
 const maxMetricExportIntervalMs = 2_147_483_647;
 
 function readServiceName(): string {
@@ -45,7 +47,7 @@ function readMetricExportInterval(): number {
 const sdk = new NodeSDK({
   serviceName: readServiceName(),
   resource: resourceFromAttributes({
-    [ATTR_SERVICE_VERSION]: "0.2.0",
+    [ATTR_SERVICE_VERSION]: serviceVersion,
   }),
   traceExporter: new ConsoleSpanExporter(),
   metricReader: new PeriodicExportingMetricReader({

@@ -75,6 +75,9 @@ GET /health
 The response identifies the service as `webhook-api` and reports its current
 status and application version.
 
+The health response and OpenTelemetry's `service.version` both read the version
+from `package.json`, so a version bump does not leave either value behind.
+
 API responses use `Cache-Control: no-store` so clients and operational checks
 always receive current results.
 

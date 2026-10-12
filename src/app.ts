@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
 import type { DeliveryClient, WebhookEvent } from "./delivery.js";
+import { serviceVersion } from "./service-metadata.js";
 import {
   activeTraceFields,
   OpenTelemetryDeliveryTelemetry,
@@ -82,7 +83,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.get("/health", async () => ({
     service: "webhook-api",
     status: "ok",
-    version: "0.2.0",
+    version: serviceVersion,
   }));
 
   app.post<{ Body: WebhookEvent }>(

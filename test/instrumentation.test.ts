@@ -1,6 +1,8 @@
 import type { NodeSDKConfiguration } from "@opentelemetry/sdk-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { serviceVersion } from "../src/service-metadata.js";
+
 const sdk = vi.hoisted(() => ({
   configure: vi.fn<(options: Partial<NodeSDKConfiguration>) => void>(),
   start: vi.fn(),
@@ -45,6 +47,15 @@ afterEach(() => {
 });
 
 describe("telemetry service name", () => {
+  it("reports the application version in the telemetry resource", async () => {
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+
+    expect(sdk.configure.mock.calls[0]?.[0].resource?.attributes).toMatchObject({
+      "service.version": serviceVersion,
+    });
+    await shutdownTelemetry();
+  }, 15_000);
+
   it("loads local settings before configuring telemetry", async () => {
     environment.load.mockImplementation(() => {
       vi.stubEnv("OTEL_SERVICE_NAME", "local-webhook-api");

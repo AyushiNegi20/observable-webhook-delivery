@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { DeliveryClient, WebhookEvent } from "../src/delivery.js";
+import { serviceVersion } from "../src/service-metadata.js";
 
 function createDeliveryClient(
   implementation: (event: WebhookEvent) => Promise<void> = async () => {},
@@ -21,7 +22,7 @@ describe("webhook delivery API", () => {
     expect(response.json()).toEqual({
       service: "webhook-api",
       status: "ok",
-      version: "0.2.0",
+      version: serviceVersion,
     });
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
