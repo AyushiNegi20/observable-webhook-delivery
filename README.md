@@ -324,6 +324,12 @@ Environment startup tests use fresh Node processes and temporary directories to
 check missing files, file-based settings, and process-variable precedence. They
 do not read or change your local `.env` file.
 
+Failed-startup tests buffer a probe span and counter in the actual application
+SDK, then trigger invalid configuration or an occupied local port. They verify
+that both signals are exported before exit code `1`, without waiting for the
+normal export interval. Exports are captured in memory; no external telemetry
+service is needed, and these tests do not load your local `.env` file.
+
 Trace-context tests check parent-child relationships across asynchronous work,
 parent-context restoration after success or failure, and log identifier isolation
 between concurrent deliveries.
