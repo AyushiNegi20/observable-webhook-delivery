@@ -2,13 +2,24 @@ import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
+  AggregationTemporality,
+  DataPointType,
+  InMemoryMetricExporter,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from "@opentelemetry/sdk-metrics";
+import {
   InMemorySpanExporter,
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { HttpDeliveryClient, type WebhookEvent } from "../src/delivery.js";
+import {
+  HttpDeliveryClient,
+  type DeliveryFailureReason,
+  type WebhookEvent,
+} from "../src/delivery.js";
 import { OpenTelemetryDeliveryTelemetry } from "../src/telemetry.js";
 
 const event: WebhookEvent = {
@@ -32,19 +43,33 @@ interface ReceivedRequest {
 
 describe("delivery over real HTTP", () => {
   let receiver: Server;
+  let recoveryStatus: number;
   let baseUrl: string;
   let requests: ReceivedRequest[];
   let exporter: InMemorySpanExporter;
   let provider: NodeTracerProvider;
+  let metricExporter: InMemoryMetricExporter;
+  let meterProvider: MeterProvider;
   let telemetry: OpenTelemetryDeliveryTelemetry;
 
   beforeEach(async () => {
     requests = [];
+    recoveryStatus = 503;
     exporter = new InMemorySpanExporter();
     provider = new NodeTracerProvider({
       spanProcessors: [new SimpleSpanProcessor(exporter)],
     });
-    telemetry = new OpenTelemetryDeliveryTelemetry(provider.getTracer("http-test"));
+    metricExporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    meterProvider = new MeterProvider({
+      readers: [new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: 60_000,
+      })],
+    });
+    telemetry = new OpenTelemetryDeliveryTelemetry(
+      provider.getTracer("http-test"),
+      meterProvider.getMeter("http-test"),
+    );
     receiver = createServer((request, response) => {
       let body = "";
       request.setEncoding("utf8");
@@ -82,11 +107,12 @@ describe("delivery over real HTTP", () => {
           "/accepted": 200,
           "/empty": 204,
           "/unavailable": 503,
+          "/recovery": recoveryStatus,
         };
         response.writeHead(statuses[request.url ?? ""] ?? 404, {
           "content-type": "text/plain",
         });
-        response.end(request.url === "/empty" ? undefined : "Receiver response");
+        response.end(response.statusCode === 204 ? undefined : "Receiver response");
       });
     });
 
@@ -113,7 +139,7 @@ describe("delivery over real HTTP", () => {
         });
       }
     } finally {
-      await provider.shutdown();
+      await Promise.all([provider.shutdown(), meterProvider.shutdown()]);
     }
   });
 
@@ -143,7 +169,7 @@ describe("delivery over real HTTP", () => {
 
   async function expectSpan(
     result: "success" | "failure",
-    reason?: string,
+    reason?: DeliveryFailureReason,
     statusCode?: number,
   ): Promise<void> {
     await provider.forceFlush();
@@ -156,6 +182,68 @@ describe("delivery over real HTTP", () => {
     expect(spans[0]?.attributes["webhook.delivery.result"]).toBe(result);
     expect(spans[0]?.attributes["webhook.delivery.failure_reason"]).toBe(reason);
     expect(spans[0]?.attributes["http.response.status_code"]).toBe(statusCode);
+    await expectMetrics(result === "success" ? 1 : 0, reason === undefined ? {} : { [reason]: 1 });
+  }
+
+  async function expectMetrics(
+    successes: number,
+    failuresByReason: Partial<Record<DeliveryFailureReason, number>>,
+  ): Promise<void> {
+    await meterProvider.forceFlush();
+    const exported = metricExporter.getMetrics().at(-1);
+    expect(exported).toBeDefined();
+    const metrics = exported?.scopeMetrics.flatMap((scope) => scope.metrics);
+    const attributes = {
+      "webhook.event.type": event.eventType,
+      "webhook.delivery.system": "http",
+    };
+    const failures = Object.values(failuresByReason).reduce((total, count) => total + count, 0);
+    for (const { name, value, monotonic } of [
+      { name: "webhook.delivery.attempts", value: successes + failures, monotonic: true },
+      { name: "webhook.delivery.active", value: 0, monotonic: false },
+    ]) {
+      const metric = metrics?.find((entry) => entry.descriptor.name === name);
+      expect(metric?.dataPointType).toBe(DataPointType.SUM);
+      expect(metric?.dataPoints).toEqual([expect.objectContaining({ attributes, value })]);
+      if (metric?.dataPointType === DataPointType.SUM) {
+        expect(metric.isMonotonic).toBe(monotonic);
+      }
+    }
+
+    const failed = metrics?.find((entry) => entry.descriptor.name === "webhook.delivery.failures");
+    if (failures > 0) {
+      expect(failed?.dataPointType).toBe(DataPointType.SUM);
+      if (failed?.dataPointType === DataPointType.SUM) expect(failed.isMonotonic).toBe(true);
+    }
+    const expectedFailures = Object.entries(failuresByReason).map(([reason, value]) =>
+      expect.objectContaining({
+        attributes: { ...attributes, "webhook.delivery.failure_reason": reason },
+        value,
+      }),
+    );
+    expect(failed?.dataPoints ?? []).toHaveLength(expectedFailures.length);
+    expect(failed?.dataPoints ?? []).toEqual(expect.arrayContaining(expectedFailures));
+
+    const duration = metrics?.find((entry) => entry.descriptor.name === "webhook.delivery.duration");
+    if (duration?.dataPointType !== DataPointType.HISTOGRAM) {
+      throw new Error("Expected an exported delivery duration histogram");
+    }
+    expect(duration.descriptor.unit).toBe("ms");
+    expect(duration.dataPoints).toHaveLength(Number(successes > 0) + Number(failures > 0));
+    for (const [result, count] of [["success", successes], ["failure", failures]] as const) {
+      const point = duration.dataPoints.find(
+        (entry) => entry.attributes["webhook.delivery.result"] === result,
+      );
+      if (count === 0) {
+        expect(point).toBeUndefined();
+        continue;
+      }
+      expect(point?.attributes).toEqual({ ...attributes, "webhook.delivery.result": result });
+      expect(point?.value.count).toBe(count);
+      expect(Number.isFinite(point?.value.sum)).toBe(true);
+      expect(point?.value.sum).toBeGreaterThanOrEqual(0);
+      expect(point?.value.buckets.counts.reduce((total, bucket) => total + bucket, 0)).toBe(count);
+    }
   }
 
   it.each(["/accepted", "/empty"])(
@@ -203,5 +291,22 @@ describe("delivery over real HTTP", () => {
     });
     expectRequest("/slow");
     await expectSpan("failure", "timeout");
+  }, 15_000);
+
+  it("keeps cumulative metrics consistent when the receiver recovers", async () => {
+    await expect(deliver("/recovery")).rejects.toMatchObject({ reason: "http_status" });
+    await expectMetrics(0, { http_status: 1 });
+
+    recoveryStatus = 200;
+    await expect(deliver("/recovery")).resolves.toBeUndefined();
+    await expectMetrics(1, { http_status: 1 });
+
+    recoveryStatus = 204;
+    await expect(deliver("/recovery")).resolves.toBeUndefined();
+    await expectMetrics(2, { http_status: 1 });
+    expect(requests.map((request) => request.path)).toEqual(["/recovery", "/recovery", "/recovery"]);
+    await provider.forceFlush();
+    expect(exporter.getFinishedSpans().map((span) => span.attributes["webhook.delivery.result"]))
+      .toEqual(["failure", "success", "success"]);
   }, 15_000);
 });

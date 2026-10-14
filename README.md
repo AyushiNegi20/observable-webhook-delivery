@@ -338,6 +338,12 @@ use real requests to check successful responses, no-content responses, receiver
 errors, and delivery timeouts together with their custom spans. They do not need
 external services.
 
+These tests also check exported attempt and failure counts, the active count
+returning to zero, and duration histogram observations for each outcome. A
+recovery scenario sends a failed request followed by successful ones: attempts
+keep increasing, the earlier failure remains counted, and active work returns to
+zero after each delivery. Recovery does not reset cumulative counters.
+
 ## Run with Docker
 
 ```bash
