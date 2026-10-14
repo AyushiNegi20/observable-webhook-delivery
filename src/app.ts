@@ -136,6 +136,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
       try {
         await deliveryTelemetry.trackDelivery(event.eventType, async () => {
+          const startedAt = performance.now();
           request.log.info(
             {
               ...activeTraceFields(),
@@ -154,6 +155,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
                 err: error,
                 eventId: event.id,
                 eventType: event.eventType,
+                durationMs: performance.now() - startedAt,
               },
               "Webhook delivery failed",
             );
@@ -165,6 +167,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
               ...activeTraceFields(),
               eventId: event.id,
               eventType: event.eventType,
+              durationMs: performance.now() - startedAt,
             },
             "Webhook delivery completed",
           );
