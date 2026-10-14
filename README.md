@@ -301,10 +301,11 @@ telemetry SDK. If the application logger is not available yet, the startup error
 and any cleanup error go to stderr. The process exits with code `1`, and signal
 handlers are not installed until the application has been constructed.
 
-If both `SIGINT` and `SIGTERM` arrive, cleanup and process exit still run only
-once. Signal handling and failed-startup cleanup share the same resource shutdown
-operation. The process waits for that operation before exiting, including when
-telemetry flushing fails.
+Repeated `SIGINT` or `SIGTERM` signals, including a mix of both, run cleanup and
+process exit only once. The handlers stay installed while cleanup is in progress,
+so another signal does not bypass the pending telemetry flush. Signal handling
+and failed-startup cleanup share the same resource shutdown operation. The process
+waits for that operation before exiting, including when telemetry flushing fails.
 
 ## Commands
 

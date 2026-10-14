@@ -42,8 +42,12 @@ function pendingStep() {
   return { promise, finish };
 }
 
+function rawSignalListeners(signal: NodeJS.Signals): NodeJS.SignalsListener[] {
+  return process.rawListeners(signal) as NodeJS.SignalsListener[];
+}
+
 function invokeSignalHandler(signal: (typeof signals)[number]): void {
-  const listeners = process.listeners(signal).filter(
+  const listeners = rawSignalListeners(signal).filter(
     (listener) => !originalListeners.get(signal)?.includes(listener),
   );
   expect(listeners).toHaveLength(1);
@@ -64,7 +68,7 @@ beforeEach(() => {
   originalExitCode = process.exitCode;
   process.exitCode = undefined;
   for (const signal of signals) {
-    originalListeners.set(signal, process.listeners(signal));
+    originalListeners.set(signal, rawSignalListeners(signal));
   }
   vi.spyOn(process, "exit").mockImplementation((code) => {
     server.exit(code);
@@ -74,7 +78,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const signal of signals) {
-    for (const listener of process.listeners(signal)) {
+    for (const listener of rawSignalListeners(signal)) {
       if (!originalListeners.get(signal)?.includes(listener)) {
         process.removeListener(signal, listener);
       }
@@ -102,7 +106,7 @@ describe("server startup cleanup", () => {
       expect(server.exit).not.toHaveBeenCalled();
       expect(process.exitCode).toBe(1);
       for (const signal of signals) {
-        expect(process.listeners(signal)).toEqual(originalListeners.get(signal));
+        expect(rawSignalListeners(signal)).toEqual(originalListeners.get(signal));
       }
     },
     15_000,
@@ -173,6 +177,37 @@ describe("server startup cleanup", () => {
 });
 
 describe("shutdown signals", () => {
+  it.each(signals)("keeps %s handled while closing and flushing", async (signal) => {
+    const closing = pendingStep();
+    const flushing = pendingStep();
+    server.close.mockReturnValue(closing.promise);
+    server.flush.mockReturnValue(flushing.promise);
+    await import("../src/server.js");
+
+    try {
+      invokeSignalHandler(signal);
+      invokeSignalHandler(signal);
+      expect(server.close).toHaveBeenCalledOnce();
+      expect(server.flush).not.toHaveBeenCalled();
+      expect(server.exit).not.toHaveBeenCalled();
+
+      closing.finish();
+      await vi.waitFor(() => expect(server.flush).toHaveBeenCalledOnce());
+      invokeSignalHandler(signal);
+      expect(server.close).toHaveBeenCalledOnce();
+      expect(server.flush).toHaveBeenCalledOnce();
+      expect(server.exit).not.toHaveBeenCalled();
+      expect(server.log.info).toHaveBeenCalledExactlyOnceWith({ signal }, "Server shutdown started");
+
+      flushing.finish();
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalledExactlyOnceWith(0));
+    } finally {
+      closing.finish();
+      flushing.finish();
+      await vi.waitFor(() => expect(server.exit).toHaveBeenCalled());
+    }
+  }, 15_000);
+
   it("runs cleanup once and waits for the flush when both signals arrive", async () => {
     const closing = pendingStep();
     const flushing = pendingStep();

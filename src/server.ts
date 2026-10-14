@@ -52,10 +52,10 @@ try {
     mockReceiverStatusCode: config.mockReceiverStatusCode,
   });
 
-  process.once("SIGTERM", () => {
+  process.on("SIGTERM", () => {
     void shutdown("SIGTERM");
   });
-  process.once("SIGINT", () => {
+  process.on("SIGINT", () => {
     void shutdown("SIGINT");
   });
 
