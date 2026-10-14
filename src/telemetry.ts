@@ -11,7 +11,7 @@ import {
   type UpDownCounter,
 } from "@opentelemetry/api";
 
-import { DeliveryError } from "./delivery.js";
+import { DeliveryError, deliveryFailureReason } from "./delivery.js";
 import { serviceVersion } from "./service-metadata.js";
 
 const instrumentationName = "observable-webhook-delivery";
@@ -77,7 +77,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
           return await operation();
         } catch (error) {
           result = "failure";
-          const failureReason = error instanceof DeliveryError ? error.reason : "unexpected";
+          const failureReason = deliveryFailureReason(error);
           span.setAttribute("webhook.delivery.failure_reason", failureReason);
           if (error instanceof DeliveryError && error.statusCode !== undefined) {
             span.setAttribute("http.response.status_code", error.statusCode);

@@ -221,6 +221,13 @@ clock. This is the elapsed delivery operation time, not the full incoming reques
 time or the mock receiver's configured delay. It can contain fractional
 milliseconds. Started logs omit it because the outcome is still pending.
 
+Failed delivery logs expose `failureReason` as a top-level field, using the same
+classification as the delivery span and failure counter. A receiver's HTTP
+response adds `statusCode`; network errors and timeouts omit it. This lets you
+filter logs without parsing the nested `err` object, which is retained for
+diagnostics. Successful delivery logs omit both failure fields, and the public
+API still returns its generic error response.
+
 When using `buildApp` directly, its `logger` option accepts a compatible logger
 instance as well as `true` or `false`. A supplied logger retains its bindings and
 receives both request logs and delivery logs. Omitting it enables JSON logging.

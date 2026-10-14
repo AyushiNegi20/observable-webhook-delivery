@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
-import type { DeliveryClient, WebhookEvent } from "./delivery.js";
+import {
+  DeliveryError,
+  deliveryFailureReason,
+  type DeliveryClient,
+  type WebhookEvent,
+} from "./delivery.js";
 import { serviceVersion } from "./service-metadata.js";
 import {
   activeTraceFields,
@@ -156,6 +161,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
                 eventId: event.id,
                 eventType: event.eventType,
                 durationMs: performance.now() - startedAt,
+                failureReason: deliveryFailureReason(error),
+                statusCode: error instanceof DeliveryError ? error.statusCode : undefined,
               },
               "Webhook delivery failed",
             );

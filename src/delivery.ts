@@ -29,6 +29,10 @@ export class DeliveryError extends Error {
   }
 }
 
+export function deliveryFailureReason(error: unknown): DeliveryFailureReason | "unexpected" {
+  return error instanceof DeliveryError ? error.reason : "unexpected";
+}
+
 export class HttpDeliveryClient implements DeliveryClient {
   constructor(
     private readonly targetUrl: string,

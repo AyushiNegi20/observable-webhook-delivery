@@ -111,8 +111,87 @@ describe("delivery log correlation", () => {
       }
       if (failed) {
         expect(response.body).not.toContain("Receiver unavailable");
+      } else {
+        for (const record of deliveryLogs) {
+          expect(record).not.toHaveProperty("failureReason");
+          expect(record).not.toHaveProperty("statusCode");
+        }
       }
     },
     15_000,
   );
+
+  it.each([
+    {
+      name: "a network error",
+      error: new DeliveryError("Destination unreachable", { reason: "network" }),
+      reason: "network", statusCode: undefined,
+    },
+    {
+      name: "a timeout",
+      error: new DeliveryError("Delivery deadline expired", { reason: "timeout" }),
+      reason: "timeout", statusCode: undefined,
+    },
+    {
+      name: "an unclassified delivery error",
+      error: new DeliveryError("Unclassified failure"),
+      reason: "unknown", statusCode: undefined,
+    },
+    {
+      name: "a rate-limited receiver",
+      error: new DeliveryError("Receiver rate limited", { reason: "http_status", statusCode: 429 }),
+      reason: "http_status", statusCode: 429,
+    },
+    {
+      name: "an unavailable receiver",
+      error: new DeliveryError("Receiver unavailable", { reason: "http_status", statusCode: 503 }),
+      reason: "http_status", statusCode: 503,
+    },
+    {
+      name: "an unexpected exception",
+      error: new Error("Unexpected failure"),
+      reason: "unexpected", statusCode: undefined,
+    },
+    {
+      name: "a non-Error rejection",
+      error: "Unexpected rejection",
+      reason: "unexpected", statusCode: undefined,
+    },
+  ])("logs searchable fields for $name", async ({ error, reason, statusCode }) => {
+    app = buildApp({
+      logger: captured.logger,
+      telemetry: new OpenTelemetryDeliveryTelemetry(provider.getTracer("log-test")),
+      deliveryClient: { async deliver() { throw error; } },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/events",
+      payload: { eventType: "invoice.created", data: {} },
+    });
+    await provider.forceFlush();
+    const spans = exporter.getFinishedSpans();
+    expect(spans).toHaveLength(1);
+    const failures = captured.records.filter((record) => record.msg === "Webhook delivery failed");
+    expect(failures).toHaveLength(1);
+    const failure = failures[0];
+
+    expect(failure).toMatchObject({
+      level: 50,
+      failureReason: reason,
+      durationMs: expect.any(Number),
+      reqId: response.headers["x-request-id"],
+      traceId: spans[0]?.spanContext().traceId,
+      spanId: spans[0]?.spanContext().spanId,
+    });
+    expect(failure).toHaveProperty("err");
+    expect(failure?.failureReason).toBe(spans[0]?.attributes["webhook.delivery.failure_reason"]);
+    if (statusCode === undefined) expect(failure).not.toHaveProperty("statusCode");
+    else expect(failure?.statusCode).toBe(statusCode);
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({
+      eventId: expect.any(String),
+      status: "failed",
+      error: "Webhook delivery failed",
+    });
+  }, 15_000);
 });
