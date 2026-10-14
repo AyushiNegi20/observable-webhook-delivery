@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const server = vi.hoisted(() => ({
+  configure: vi.fn(),
+  createClient: vi.fn(),
+  build: vi.fn(),
   listen: vi.fn<() => Promise<string>>(),
   close: vi.fn<() => Promise<void>>(),
   flush: vi.fn<() => Promise<void>>(),
@@ -8,18 +11,23 @@ const server = vi.hoisted(() => ({
   log: { info: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("../src/app.js", () => ({ buildApp: () => server }));
+vi.mock("../src/app.js", () => ({ buildApp: () => { server.build(); return server; } }));
 vi.mock("../src/config.js", () => ({
-  loadConfig: () => ({
-    host: "127.0.0.1",
-    port: 3000,
-    deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
-    deliveryTimeoutMs: 3000,
-    mockReceiverStatusCode: 200,
-    mockReceiverDelayMs: 0,
-  }),
+  loadConfig: () => {
+    server.configure();
+    return {
+      host: "127.0.0.1",
+      port: 3000,
+      deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
+      deliveryTimeoutMs: 3000,
+      mockReceiverStatusCode: 200,
+      mockReceiverDelayMs: 0,
+    };
+  },
 }));
-vi.mock("../src/delivery.js", () => ({ HttpDeliveryClient: class {} }));
+vi.mock("../src/delivery.js", () => ({
+  HttpDeliveryClient: class { constructor() { server.createClient(); } },
+}));
 vi.mock("../src/instrumentation.js", () => ({ shutdownTelemetry: server.flush }));
 
 const signals = ["SIGINT", "SIGTERM"] as const;
@@ -44,6 +52,9 @@ function invokeSignalHandler(signal: (typeof signals)[number]): void {
 
 beforeEach(() => {
   vi.resetModules();
+  server.configure.mockReset();
+  server.createClient.mockReset();
+  server.build.mockReset();
   server.listen.mockReset().mockResolvedValue("http://127.0.0.1:3000");
   server.close.mockReset().mockResolvedValue(undefined);
   server.flush.mockReset().mockResolvedValue(undefined);
@@ -74,6 +85,47 @@ afterEach(() => {
 });
 
 describe("server startup cleanup", () => {
+  it.each(["configure", "createClient", "build"] as const)(
+    "flushes telemetry when %s fails before an app is available",
+    async (step) => {
+      const failure = new Error("Startup initialization failed");
+      server[step].mockImplementation(() => { throw failure; });
+      const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await import("../src/server.js");
+
+      expect(stderr).toHaveBeenCalledExactlyOnceWith("Server failed to start", failure);
+      expect(server.listen).not.toHaveBeenCalled();
+      expect(server.close).not.toHaveBeenCalled();
+      expect(server.log.error).not.toHaveBeenCalled();
+      expect(server.flush).toHaveBeenCalledOnce();
+      expect(server.exit).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+      for (const signal of signals) {
+        expect(process.listeners(signal)).toEqual(originalListeners.get(signal));
+      }
+    },
+    15_000,
+  );
+
+  it("reports an early startup error even when telemetry cleanup fails", async () => {
+    const failure = new Error("Invalid configuration");
+    const cleanupFailure = new Error("Exporter flush failed");
+    server.configure.mockImplementation(() => { throw failure; });
+    server.flush.mockRejectedValue(cleanupFailure);
+    const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await import("../src/server.js");
+
+    expect(stderr.mock.calls).toEqual([
+      ["Server failed to start", failure],
+      ["Startup cleanup failed", cleanupFailure],
+    ]);
+    expect(server.close).not.toHaveBeenCalled();
+    expect(server.flush).toHaveBeenCalledOnce();
+    expect(process.exitCode).toBe(1);
+  }, 15_000);
+
   it("leaves resources running after a successful listen", async () => {
     await import("../src/server.js");
 
