@@ -22,7 +22,7 @@ The project currently provides:
 - Rejection of unknown request fields
 - Startup validation for host and port settings
 - Startup validation for the webhook destination URL
-- A 256 KB request body limit
+- A 256 KiB event request limit and a separate mock receiver limit
 - Unit and integration tests
 - Docker support
 - Continuous integration with GitHub Actions
@@ -95,6 +95,13 @@ POST /mock/webhooks
 ```
 
 The mock receiver is the only configured destination in the first milestone. Arbitrary destination URLs are intentionally not accepted from API clients.
+
+`POST /events` accepts at most 262144 bytes (256 KiB). The mock receiver allows
+2097152 bytes (2 MiB) to leave room for the generated event ID and timestamp, plus
+size changes when parsed JSON is serialized for delivery. For example, some
+numbers written in exponent notation become longer decimal strings. Both limits
+apply to the complete request body in bytes, not the number of characters in a
+field. External receivers enforce their own limits.
 
 Outgoing deliveries include `x-webhook-id`, `x-webhook-event`,
 `x-webhook-created-at`, `x-webhook-attempt`, and `x-webhook-schema-version`

@@ -94,6 +94,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.post<{ Body: WebhookEvent }>(
     "/mock/webhooks",
     {
+      // Delivery adds metadata, and serializing parsed JSON can expand its size.
+      bodyLimit: 2 * 1024 * 1024,
       schema: {
         body: webhookEventSchema,
       },
