@@ -108,6 +108,12 @@ byte over returns `413` before the handler runs. UTF-8 text can use multiple byt
 per character, so a character count is not a reliable size check. Use
 `Buffer.byteLength(JSON.stringify(body), "utf8")` when checking a body in Node.js.
 
+Invalid schemas, malformed JSON, oversized bodies, and unsupported content types
+are rejected before delivery starts. They do not create a `webhook.deliver` span
+or change the delivery counters and duration histogram. Request logs and automatic
+HTTP spans can still record the rejected request. This keeps bad input separate
+from failures that occur while trying to reach a receiver.
+
 Outgoing deliveries include `x-webhook-id`, `x-webhook-event`,
 `x-webhook-created-at`, `x-webhook-attempt`, and `x-webhook-schema-version`
 headers so receivers can identify and order events before parsing the payload.
