@@ -86,7 +86,7 @@ describe("delivery failure telemetry", () => {
     ]);
   }
 
-  it.each(["network", "timeout", "http_status", "unknown"] as const)(
+  it.each(["serialization", "network", "timeout", "http_status", "unknown"] as const)(
     "labels %s failures on the span and counter",
     async (reason) => {
       await expectFailure(new DeliveryError("Delivery failed", { reason }), reason);

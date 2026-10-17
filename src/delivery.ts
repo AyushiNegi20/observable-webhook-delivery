@@ -9,7 +9,12 @@ export interface DeliveryClient {
   deliver(event: WebhookEvent): Promise<void>;
 }
 
-export type DeliveryFailureReason = "network" | "timeout" | "http_status" | "unknown";
+export type DeliveryFailureReason =
+  | "serialization"
+  | "network"
+  | "timeout"
+  | "http_status"
+  | "unknown";
 
 export class DeliveryError extends Error {
   readonly reason: DeliveryFailureReason;
@@ -40,6 +45,19 @@ export class HttpDeliveryClient implements DeliveryClient {
   ) {}
 
   async deliver(event: WebhookEvent): Promise<void> {
+    let body: string;
+    try {
+      body = JSON.stringify(event);
+      if (body === undefined) {
+        throw new TypeError("Webhook event serialized to undefined");
+      }
+    } catch (error) {
+      throw new DeliveryError("Webhook event could not be serialized", {
+        cause: error,
+        reason: "serialization",
+      });
+    }
+
     const signal = AbortSignal.timeout(this.timeoutMs);
     let response: Response;
 
@@ -56,7 +74,7 @@ export class HttpDeliveryClient implements DeliveryClient {
           "x-webhook-id": event.id,
           "x-webhook-schema-version": "1",
         },
-        body: JSON.stringify(event),
+        body,
         redirect: "error",
         signal,
       });

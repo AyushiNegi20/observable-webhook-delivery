@@ -19,6 +19,36 @@ afterEach(() => {
 });
 
 describe("HTTP delivery client", () => {
+  it.each(["circular data", "bigint data", "throwing toJSON", "undefined toJSON"])(
+    "rejects %s before starting an HTTP request or deadline",
+    async (kind) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      const customError = new Error("Cannot serialize this value");
+      const invalidEvent = { ...event, data: { ...event.data } };
+      if (kind === "circular data") invalidEvent.data.self = invalidEvent.data;
+      if (kind === "bigint data") invalidEvent.data.amount = 1n;
+      if (kind === "throwing toJSON") {
+        invalidEvent.data.toJSON = () => { throw customError; };
+      }
+      if (kind === "undefined toJSON") {
+        Object.assign(invalidEvent, { toJSON: () => undefined });
+      }
+      const client = new HttpDeliveryClient("http://receiver.test/webhooks", 1000);
+
+      await expect(client.deliver(invalidEvent)).rejects.toMatchObject({
+        name: "DeliveryError",
+        message: "Webhook event could not be serialized",
+        reason: "serialization",
+        statusCode: undefined,
+        cause: kind === "throwing toJSON" ? customError : expect.any(TypeError),
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(timeout).not.toHaveBeenCalled();
+    },
+  );
+
   it("posts the event to the configured destination", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

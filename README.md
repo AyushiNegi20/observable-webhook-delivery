@@ -293,10 +293,17 @@ Each completed `webhook.deliver` span includes `webhook.delivery.result`, set to
 and delivery timing measurements can be filtered by the same outcome.
 
 Failed delivery spans and the failure counter include
-`webhook.delivery.failure_reason`: `timeout`, `network`, `http_status`, `unknown`,
-or `unexpected`. The last category covers errors outside `DeliveryError`. These
-fixed categories let you group failures without putting exception messages into
-metric labels. Successful delivery spans do not include a failure reason.
+`webhook.delivery.failure_reason`: `serialization`, `timeout`, `network`,
+`http_status`, `unknown`, or `unexpected`. The last category covers errors outside
+`DeliveryError`. These fixed categories let you group failures without putting
+exception messages into metric labels. Successful delivery spans do not include
+a failure reason.
+
+`serialization` means the event could not be converted to an outgoing JSON body.
+No HTTP request or delivery timeout is started in that case. This can happen with
+very deeply nested JSON, or with circular references and BigInt values supplied
+by an in-process caller. It is a failed delivery attempt, not a network outage.
+The original exception remains available as the error cause for diagnostics.
 
 Failed delivery spans also include `http.response.status_code` when the receiver
 returned an HTTP response. Timeouts and network failures omit this attribute.
