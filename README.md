@@ -305,6 +305,12 @@ very deeply nested JSON, or with circular references and BigInt values supplied
 by an in-process caller. It is a failed delivery attempt, not a network outage.
 The original exception remains available as the error cause for diagnostics.
 
+An API regression test submits valid JSON below the request size limit but too
+deep for the runtime to serialize. It checks the failure log, span, counter, and
+duration observation, then sends a normal event through the same application.
+The normal event succeeds, the active count returns to zero, and the earlier
+serialization failure remains counted.
+
 Failed delivery spans also include `http.response.status_code` when the receiver
 returned an HTTP response. Timeouts and network failures omit this attribute.
 The receiver status is not added to metric labels.
