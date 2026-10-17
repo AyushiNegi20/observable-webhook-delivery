@@ -394,6 +394,12 @@ use real requests to check successful responses, no-content responses, receiver
 errors, and delivery timeouts together with their custom spans. They do not need
 external services.
 
+Local-address tests send an event through both HTTP hops using IPv4 and IPv6
+loopback listeners on OS-assigned ports. They verify the derived receiver URL,
+the received event, and the actual peer address. Only the IPv6 case is skipped
+when the operating system reports that IPv6 loopback is unavailable; connection
+and delivery failures are not skipped.
+
 The sender uses the receiver's HTTP status to decide the delivery outcome; it
 does not read the response body. Integration tests cover both `200` and `503`
 responses whose bodies never finish. They check that delivery completes, the
