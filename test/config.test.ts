@@ -20,6 +20,29 @@ describe("application configuration", () => {
     );
   });
 
+  it.each([
+    { host: "0.0.0.0", targetHost: "127.0.0.1" },
+    { host: "127.0.0.1", targetHost: "127.0.0.1" },
+    { host: "192.0.2.10", targetHost: "192.0.2.10" },
+    { host: "localhost", targetHost: "localhost" },
+    { host: "::", targetHost: "[::1]" },
+    { host: "0:0:0:0:0:0:0:0", targetHost: "[::1]" },
+    { host: " ::1 ", targetHost: "[::1]" },
+    { host: "2001:db8::10", targetHost: "[2001:db8::10]" },
+  ])("derives the local receiver from HOST=$host and PORT", ({ host, targetHost }) => {
+    expect(loadConfig({ HOST: host, PORT: "4312" })).toMatchObject({
+      host: host.trim(),
+      port: 4312,
+      deliveryTargetUrl: `http://${targetHost}:4312/mock/webhooks`,
+    });
+  });
+
+  it("keeps an explicit receiver independent of the bind address", () => {
+    expect(loadConfig({
+      HOST: "::1", PORT: "4312", DELIVERY_TARGET_URL: "https://receiver.test/events",
+    }).deliveryTargetUrl).toBe("https://receiver.test/events");
+  });
+
   it("rejects an excessive delivery timeout", () => {
     expect(() => loadConfig({ DELIVERY_TIMEOUT_MS: "60001" })).toThrow(
       "Expected DELIVERY_TIMEOUT_MS to be at most 60000",

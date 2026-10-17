@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 export interface AppConfig {
   deliveryTargetUrl: string;
   deliveryTimeoutMs: number;
@@ -103,14 +105,24 @@ function readHttpUrl(value: string): string {
   return value;
 }
 
+function localDeliveryTarget(host: string, port: number): string {
+  const hostname = isIP(host) === 6 ? `[${host}]` : host;
+  const target = new URL(`http://${hostname}:${port}/mock/webhooks`);
+  // Wildcard bind addresses need a concrete loopback address for delivery.
+  if (target.hostname === "0.0.0.0") target.hostname = "127.0.0.1";
+  if (target.hostname === "[::]") target.hostname = "[::1]";
+  return target.href;
+}
+
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const port = readPort(environment.PORT);
+  const host = readHost(environment.HOST);
   const deliveryTargetUrl =
     environment.DELIVERY_TARGET_URL ??
-    `http://127.0.0.1:${port}/mock/webhooks`;
+    localDeliveryTarget(host, port);
 
   return {
-    host: readHost(environment.HOST),
+    host,
     port,
     deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
     deliveryTimeoutMs: readDeliveryTimeout(environment.DELIVERY_TIMEOUT_MS),

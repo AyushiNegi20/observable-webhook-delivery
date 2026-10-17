@@ -146,6 +146,13 @@ errors stop startup instead of silently ignoring configuration.
 `HOST` defaults to `0.0.0.0`. Surrounding whitespace is trimmed before the server
 binds, and an empty or whitespace-only value is rejected.
 
+Without `DELIVERY_TARGET_URL`, the mock receiver URL follows `HOST` and `PORT`.
+Wildcard hosts use loopback destinations: `0.0.0.0` uses `127.0.0.1`, and `::`
+uses `[::1]`. A specific address or hostname is reused as the destination.
+Set IPv6 `HOST` values without brackets, for example `HOST=::1`; the generated
+URL adds the required brackets. An explicit `DELIVERY_TARGET_URL` always wins
+and is not rewritten when the bind host or port changes.
+
 Delivery timeouts must be positive and cannot exceed 60 seconds.
 
 Delivery errors distinguish an expired deadline (`timeout`), a transport failure
