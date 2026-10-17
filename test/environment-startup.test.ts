@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, rmdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -119,6 +119,35 @@ describe("environment settings in a fresh process", () => {
       },
       serviceName: "process-test-api",
       metricInterval: "60000",
+    });
+  }, 40_000);
+
+  it.each([
+    { host: "0.0.0.0", targetHost: "127.0.0.1" },
+    { host: "::1", targetHost: "[::1]" },
+  ])("keeps the copied example usable with HOST=$host and a different port", async ({ host, targetHost }) => {
+    const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
+    await writeFile(join(directory, ".env"), example);
+
+    expect(await readStartup({ HOST: host, PORT: "4312" })).toMatchObject({
+      config: {
+        host,
+        port: 4312,
+        deliveryTargetUrl: `http://${targetHost}:4312/mock/webhooks`,
+      },
+    });
+  }, 40_000);
+
+  it("preserves an explicit file-based receiver when the process overrides the bind settings", async () => {
+    await writeFile(join(directory, ".env"), localSettings
+      + "\nDELIVERY_TARGET_URL=https://receiver.example/webhooks\n");
+
+    expect(await readStartup({ HOST: "::1", PORT: "4312" })).toMatchObject({
+      config: {
+        host: "::1",
+        port: 4312,
+        deliveryTargetUrl: "https://receiver.example/webhooks",
+      },
     });
   }, 40_000);
 

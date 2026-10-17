@@ -153,6 +153,12 @@ Set IPv6 `HOST` values without brackets, for example `HOST=::1`; the generated
 URL adds the required brackets. An explicit `DELIVERY_TARGET_URL` always wins
 and is not rewritten when the bind host or port changes.
 
+The example environment file leaves `DELIVERY_TARGET_URL` commented out so
+changing `HOST` or `PORT` keeps local delivery working. If you copied an older
+example with a fixed receiver URL, remove that setting to use the derived local
+default, or update it deliberately for your receiver. Do not leave an empty
+`DELIVERY_TARGET_URL=` entry: an explicitly empty URL is invalid.
+
 Delivery timeouts must be positive and cannot exceed 60 seconds.
 
 Delivery errors distinguish an expired deadline (`timeout`), a transport failure
