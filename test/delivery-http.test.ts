@@ -1,4 +1,4 @@
-import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
+import { createServer, type IncomingHttpHeaders, type Server, type ServerResponse } from "node:http";
 
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
@@ -13,7 +13,7 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HttpDeliveryClient,
@@ -43,6 +43,7 @@ interface ReceivedRequest {
 
 describe("delivery over real HTTP", () => {
   let receiver: Server;
+  let streamingResponse: ServerResponse | undefined;
   let recoveryStatus: number;
   let baseUrl: string;
   let requests: ReceivedRequest[];
@@ -54,6 +55,7 @@ describe("delivery over real HTTP", () => {
 
   beforeEach(async () => {
     requests = [];
+    streamingResponse = undefined;
     recoveryStatus = 503;
     exporter = new InMemorySpanExporter();
     provider = new NodeTracerProvider({
@@ -86,6 +88,16 @@ describe("delivery over real HTTP", () => {
 
         if (request.url === "/slow") {
           // Leave the response pending so the real delivery deadline expires.
+          return;
+        }
+
+        if (request.url === "/streaming/200" || request.url === "/streaming/503") {
+          streamingResponse = response;
+          response.writeHead(request.url === "/streaming/200" ? 200 : 503, {
+            "content-type": "text/plain",
+          });
+          // Send a status and a partial body, but never finish the response.
+          response.write("private-receiver-response-marker");
           return;
         }
 
@@ -265,6 +277,33 @@ describe("delivery over real HTTP", () => {
     expectRequest("/unavailable");
     await expectSpan("failure", "http_status", 503);
   }, 15_000);
+
+  it.each([200, 503])(
+    "uses status %i and closes an unfinished receiver response",
+    async (statusCode) => {
+      const path = `/streaming/${statusCode}`;
+      // Keep the delivery deadline beyond the test so it cannot mask missing cleanup.
+      const delivery = deliver(path, 60_000);
+      if (statusCode === 200) {
+        await expect(delivery).resolves.toBeUndefined();
+        await expectSpan("success");
+      } else {
+        await expect(delivery).rejects.toMatchObject({
+          reason: "http_status", statusCode,
+        });
+        await expectSpan("failure", "http_status", statusCode);
+      }
+      expectRequest(path);
+      await vi.waitFor(() => {
+        expect(streamingResponse?.destroyed).toBe(true);
+      }, { timeout: 5000 });
+      expect(streamingResponse?.writableEnded).toBe(false);
+      const span = exporter.getFinishedSpans()[0];
+      expect(JSON.stringify({ attributes: span?.attributes, events: span?.events }))
+        .not.toContain("private-receiver-response-marker");
+    },
+    15_000,
+  );
 
   it.each(redirectCases)(
     "blocks a $statusCode redirect with a $locationType location without forwarding the event",

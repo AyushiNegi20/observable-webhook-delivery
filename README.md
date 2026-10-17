@@ -381,6 +381,13 @@ use real requests to check successful responses, no-content responses, receiver
 errors, and delivery timeouts together with their custom spans. They do not need
 external services.
 
+The sender uses the receiver's HTTP status to decide the delivery outcome; it
+does not read the response body. Integration tests cover both `200` and `503`
+responses whose bodies never finish. They check that delivery completes, the
+unused response is cancelled before the timeout, and the span and metrics keep
+the HTTP outcome instead of reporting a timeout. Cancelling the response does
+not undo any processing already performed by the receiver.
+
 These tests also check exported attempt and failure counts, the active count
 returning to zero, and duration histogram observations for each outcome. A
 recovery scenario sends a failed request followed by successful ones: attempts
