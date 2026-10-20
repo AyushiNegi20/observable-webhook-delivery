@@ -1,3 +1,7 @@
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
+
+import type { HttpInstrumentationConfig } from "@opentelemetry/instrumentation-http";
 import type { NodeSDKConfiguration } from "@opentelemetry/sdk-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +14,7 @@ const sdk = vi.hoisted(() => ({
 }));
 
 const environment = vi.hoisted(() => ({ load: vi.fn<() => void>() }));
+const http = vi.hoisted(() => ({ configure: vi.fn<(options: HttpInstrumentationConfig) => void>() }));
 
 vi.mock("node:process", () => ({ loadEnvFile: environment.load }));
 
@@ -25,7 +30,9 @@ vi.mock("@opentelemetry/sdk-node", () => ({
 }));
 
 vi.mock("@opentelemetry/instrumentation-http", () => ({
-  HttpInstrumentation: class {},
+  HttpInstrumentation: class {
+    constructor(options: HttpInstrumentationConfig) { http.configure(options); }
+  },
 }));
 
 vi.mock("@opentelemetry/instrumentation-undici", () => ({
@@ -38,12 +45,61 @@ beforeEach(() => {
   sdk.configure.mockReset();
   sdk.start.mockReset();
   sdk.shutdown.mockReset().mockResolvedValue(undefined);
+  http.configure.mockReset();
   vi.stubEnv("OTEL_METRIC_EXPORT_INTERVAL_MS", undefined);
   vi.stubEnv("OTEL_SERVICE_NAME", undefined);
+  vi.stubEnv("OTEL_TRACE_HEALTHCHECKS", undefined);
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+describe("health probe tracing", () => {
+  it.each([
+    { method: "GET", url: "/health", ignored: true },
+    { method: "HEAD", url: "/health", ignored: true },
+    { method: "GET", url: "/health?probe=ready", ignored: true },
+    { method: "HEAD", url: "/health?probe=ready", ignored: true },
+    { method: "POST", url: "/health", ignored: false },
+    { method: "GET", url: "/health/", ignored: false },
+    { method: "GET", url: "/healthy", ignored: false },
+    { method: "GET", url: "/missing", ignored: false },
+    { method: "POST", url: "/events", ignored: false },
+    { method: "POST", url: "/mock/webhooks", ignored: false },
+    { method: undefined, url: "/health", ignored: false },
+    { method: "GET", url: undefined, ignored: false },
+  ])("sets ignored=$ignored for $method $url", async ({ method, url, ignored }) => {
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+    const request = new IncomingMessage(new Socket());
+    if (method !== undefined) request.method = method;
+    if (url !== undefined) request.url = url;
+    expect(http.configure.mock.calls[0]?.[0].ignoreIncomingRequestHook?.(request)).toBe(ignored);
+    await shutdownTelemetry();
+  }, 15_000);
+
+  it.each([
+    { value: "false", ignored: true },
+    { value: "true", ignored: false },
+    { value: " true ", ignored: false },
+  ])("honors OTEL_TRACE_HEALTHCHECKS=$value", async ({ value, ignored }) => {
+    vi.stubEnv("OTEL_TRACE_HEALTHCHECKS", value);
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+    const request = new IncomingMessage(new Socket());
+    request.method = "GET";
+    request.url = "/health";
+    expect(http.configure.mock.calls[0]?.[0].ignoreIncomingRequestHook?.(request)).toBe(ignored);
+    await shutdownTelemetry();
+  }, 15_000);
+
+  it.each(["", " ", "1", "yes", "FALSE"])("rejects invalid health tracing value %j", async (value) => {
+    vi.stubEnv("OTEL_TRACE_HEALTHCHECKS", value);
+    await expect(import("../src/instrumentation.js")).rejects.toThrow(
+      "Expected OTEL_TRACE_HEALTHCHECKS to be true or false",
+    );
+    expect(sdk.configure).not.toHaveBeenCalled();
+    expect(sdk.start).not.toHaveBeenCalled();
+  }, 15_000);
 });
 
 describe("telemetry service name", () => {

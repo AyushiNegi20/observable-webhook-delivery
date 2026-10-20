@@ -15,6 +15,14 @@ import { serviceVersion } from "./service-metadata.js";
 
 const maxMetricExportIntervalMs = 2_147_483_647;
 
+function readTraceHealthChecks(): boolean {
+  const value = (process.env.OTEL_TRACE_HEALTHCHECKS ?? "false").trim();
+  if (value !== "true" && value !== "false") {
+    throw new Error("Expected OTEL_TRACE_HEALTHCHECKS to be true or false");
+  }
+  return value === "true";
+}
+
 function readServiceName(): string {
   const name = (process.env.OTEL_SERVICE_NAME ?? "webhook-api").trim();
   if (name === "") {
@@ -44,6 +52,7 @@ function readMetricExportInterval(): number {
   return parsed;
 }
 
+const traceHealthChecks = readTraceHealthChecks();
 const sdk = new NodeSDK({
   serviceName: readServiceName(),
   resource: resourceFromAttributes({
@@ -55,7 +64,15 @@ const sdk = new NodeSDK({
     exportIntervalMillis: readMetricExportInterval(),
   }),
   logRecordProcessors: [],
-  instrumentations: [new HttpInstrumentation(), new UndiciInstrumentation()],
+  instrumentations: [
+    new HttpInstrumentation({
+      ignoreIncomingRequestHook: (request) =>
+        !traceHealthChecks
+        && (request.method === "GET" || request.method === "HEAD")
+        && request.url?.split("?", 1)[0] === "/health",
+    }),
+    new UndiciInstrumentation(),
+  ],
 });
 
 sdk.start();
