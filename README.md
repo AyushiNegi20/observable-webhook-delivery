@@ -216,6 +216,45 @@ POST /events (HTTP server)
       POST /mock/webhooks (HTTP server)
 ```
 
+### Health-check tracing
+
+Routine `GET` and `HEAD` requests to `/health` do not create incoming HTTP spans
+by default. Query strings, such as `/health?probe=ready`, do not change that
+rule. Request logs, response codes, and request IDs remain available. Other
+paths, including `/health/` and `/healthy`, and unsupported methods such as
+`POST /health` are not excluded. Webhook delivery tracing is unchanged.
+
+`OTEL_TRACE_HEALTHCHECKS` is a project-specific setting, not a standard
+OpenTelemetry environment variable. It defaults to `false` and accepts only
+`true` or `false`, with surrounding whitespace ignored. Other values stop
+startup. Set it to `true` in `.env` and restart to trace health probes while
+diagnosing them. Existing sampling rules still apply.
+
+The filter runs before a response is produced, so it is based on method and path,
+not success or failure. Enable health tracing when investigating probe failures.
+The current `/health` endpoint reports that the API is running; it does not check
+whether the webhook receiver is reachable.
+
+To compare health traffic with a delivery, use the default mock receiver and
+sampling settings. Start the app with `pnpm dev`, then run these commands in a
+second PowerShell terminal:
+
+```powershell
+Invoke-RestMethod -Uri 'http://localhost:3000/health'
+Invoke-WebRequest -UseBasicParsing -Method Head -Uri 'http://localhost:3000/health?probe=ready'
+Invoke-RestMethod -Method Post -Uri 'http://localhost:3000/events' -ContentType 'application/json' -Body '{"eventType":"invoice.created","data":{"invoiceId":"inv_probe"}}'
+```
+
+With the default setting, the health calls appear in request logs but not as
+server spans. The event produces the four-span delivery chain shown above. Set
+`OTEL_TRACE_HEALTHCHECKS=true`, restart, and repeat the health calls to see their
+server spans too. Wait for the console exporter to flush, or stop the server
+gracefully. If changing `.env` appears to have no effect, check for a process
+environment value, which takes precedence. Restore `false` after debugging to
+keep routine probes out of the trace output.
+
+### Delivery context and metrics
+
 The incoming `traceparent` header connects the API request to a caller's trace.
 Outgoing delivery carries that context to the receiver, preserving the trace ID
 while each operation gets its own span ID. A valid `tracestate` also travels with
@@ -383,6 +422,11 @@ and send requests through both HTTP hops. They check the four-span parent chain,
 trace-correlated logs, receiver failures, missing or invalid headers, and an
 unsampled parent. These tests capture spans in memory, use only loopback ports,
 and run from temporary directories without loading your local `.env` file.
+
+Health-tracing integration tests use that same SDK to verify both the default
+filter and its opt-in setting. They check probe responses and request logs,
+retain traces for lookalike paths and unsupported methods, and verify that a
+subsequent webhook still produces its complete trace chain.
 
 Log-correlation tests submit successful and failed events through the API and
 match the captured delivery logs to exported spans. They verify request and
