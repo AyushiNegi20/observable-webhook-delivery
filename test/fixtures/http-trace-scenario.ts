@@ -6,9 +6,11 @@ interface Scenario {
   receiverStatus: number;
   traceparent?: string;
   tracestate?: string;
+  healthProbes?: boolean;
 }
 
 interface ObservedRequest {
+  method: string;
   path: string;
   traceId?: string;
   spanId?: string;
@@ -16,11 +18,18 @@ interface ObservedRequest {
   tracestate: string | undefined;
 }
 
-async function sendRequest(address: string, scenario: Scenario): Promise<number> {
+async function sendRequest(
+  address: string,
+  scenario: Scenario,
+  method = "POST",
+  path = "/events",
+): Promise<number> {
   const target = new URL(address);
-  const body = JSON.stringify({ eventType: "invoice.created", data: { invoiceId: "inv_trace_test" } });
+  const body = method === "POST"
+    ? JSON.stringify({ eventType: "invoice.created", data: { invoiceId: "inv_trace_test" } })
+    : "";
   const headers = [
-    "POST /events HTTP/1.1",
+    `${method} ${path} HTTP/1.1`,
     `Host: ${target.host}`,
     "Content-Type: application/json",
     `Content-Length: ${Buffer.byteLength(body)}`,
@@ -70,6 +79,7 @@ async function runScenario(scenario: Scenario) {
   });
   app.addHook("onRequest", async (request) => {
     requests.push({
+      method: request.method,
       path: request.url,
       ...activeTraceFields(),
       traceparent: typeof request.headers.traceparent === "string" ? request.headers.traceparent : undefined,
@@ -78,9 +88,20 @@ async function runScenario(scenario: Scenario) {
   });
 
   let responseStatus: number;
+  const probes: { method: string; path: string; status: number }[] = [];
   try {
     const address = await app.listen({ host: "127.0.0.1", port: 0 });
     receiverUrl = `${address}/mock/webhooks`;
+    if (scenario.healthProbes) {
+      for (const [method, path] of [
+        ["GET", "/health"], ["HEAD", "/health"],
+        ["GET", "/health?probe=ready"], ["HEAD", "/health?probe=ready"],
+        ["POST", "/health"], ["GET", "/health/"],
+        ["GET", "/healthy"], ["GET", "/missing"],
+      ] as const) {
+        probes.push({ method, path, status: await sendRequest(address, scenario, method, path) });
+      }
+    }
     responseStatus = await sendRequest(address, scenario);
   } finally {
     try {
@@ -96,6 +117,7 @@ async function runScenario(scenario: Scenario) {
 
   return {
     responseStatus,
+    probes,
     requests,
     spans: exporter.getFinishedSpans().map((span) => ({
       name: span.name,
@@ -108,6 +130,8 @@ async function runScenario(scenario: Scenario) {
       scope: span.instrumentationScope,
     })),
     logs: captured.records.filter((record) => record.eventId !== undefined),
+    requestLogs: captured.records.filter((record) =>
+      record.msg === "incoming request" || record.msg === "request completed"),
   };
 }
 
