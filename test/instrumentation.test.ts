@@ -103,6 +103,19 @@ describe("health probe tracing", () => {
 });
 
 describe("telemetry service name", () => {
+  it("assigns one UUID to the SDK resource for the process lifetime", async () => {
+    const { shutdownTelemetry } = await import("../src/instrumentation.js");
+    const instanceId = sdk.configure.mock.calls[0]?.[0].resource?.attributes["service.instance.id"];
+    expect(instanceId).toEqual(expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    ));
+
+    await import("../src/instrumentation.js");
+    expect(sdk.configure).toHaveBeenCalledOnce();
+    expect(sdk.configure.mock.calls[0]?.[0].resource?.attributes["service.instance.id"]).toBe(instanceId);
+    await shutdownTelemetry();
+  }, 15_000);
+
   it("reports the application version in the telemetry resource", async () => {
     const { shutdownTelemetry } = await import("../src/instrumentation.js");
 

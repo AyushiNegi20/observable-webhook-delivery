@@ -1,5 +1,7 @@
 import "./environment.js";
 
+import { randomUUID } from "node:crypto";
+
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { resourceFromAttributes } from "@opentelemetry/resources";
@@ -9,7 +11,7 @@ import {
 } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-node";
-import { ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
+import { ATTR_SERVICE_INSTANCE_ID, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 
 import { serviceVersion } from "./service-metadata.js";
 
@@ -56,6 +58,7 @@ const traceHealthChecks = readTraceHealthChecks();
 const sdk = new NodeSDK({
   serviceName: readServiceName(),
   resource: resourceFromAttributes({
+    [ATTR_SERVICE_INSTANCE_ID]: randomUUID(),
     [ATTR_SERVICE_VERSION]: serviceVersion,
   }),
   traceExporter: new ConsoleSpanExporter(),
