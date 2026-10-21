@@ -200,6 +200,45 @@ resource's `service.version` identifies the running application; the scope
 identifies the code that created those signals. Automatic HTTP instrumentation
 keeps its own library name and version.
 
+### Service identity
+
+Each application SDK startup generates a UUID for `service.instance.id`. The
+same ID is attached to the resource used by traces and metrics for that running
+instance. It does not change for each event. A restart generates a new ID, so two
+copies of the same application version can be distinguished.
+
+| Resource attribute | Identifies | Default |
+|---|---|---|
+| `service.name` | The logical service | `webhook-api` |
+| `service.version` | The application version | Version from `package.json` |
+| `service.instance.id` | One running instance | A UUID generated at SDK startup |
+
+The instance ID belongs on the resource, not in each custom span's attributes or
+delivery metric labels. Backends may still use resource attributes to separate
+metric series by instance. This is intentional; do not generate a new instance
+ID for every request. JSON request logs continue to use request and trace IDs
+for correlation and do not automatically include the SDK's resource attributes.
+
+With the default resource detection, `OTEL_RESOURCE_ATTRIBUTES` can add deployment
+metadata without changing application code. For example, add this to `.env`
+and restart:
+
+```text
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=webhook-demo,deployment.environment.name=development
+```
+
+A deployment can also supply `service.instance.id` through that setting. An
+explicit value overrides the generated UUID on both traces and metrics. Only
+do this when the deployment supplies a unique, non-empty ID for each running
+instance. Do not copy a fixed instance ID into a shared environment template.
+Keep credentials, customer details, and event identifiers out of resource values.
+
+To check the generated identity, submit two events and compare
+`service.instance.id` in the exported span and metric resources. They should
+match within that process. Restart the app and repeat: the ID should change
+unless an explicit override is configured. Fresh-process tests verify this
+behavior and that namespace and environment attributes are preserved.
+
 `OTEL_SERVICE_NAME` defaults to `webhook-api`. Surrounding whitespace is trimmed,
 and blank names are rejected at startup so telemetry always has a service name.
 
