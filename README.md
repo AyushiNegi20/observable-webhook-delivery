@@ -310,6 +310,43 @@ The custom metrics are:
 | `webhook.delivery.active` | UpDownCounter | Counts deliveries currently in progress |
 | `webhook.delivery.duration` | Histogram | Records delivery time in milliseconds |
 
+### Metric event-type budget
+
+Metric cardinality is the number of distinct label combinations. A length limit
+on `eventType` does not limit how many different values callers can send. For
+example, putting an invoice ID into the event type would create a new metric
+series for every invoice.
+
+Each `OpenTelemetryDeliveryTelemetry` instance keeps the first 100 distinct event
+types as named metric labels. Later types are counted under `webhook.event.type`
+with the value `_other`. This applies to attempts, failures, active deliveries,
+and duration observations. Grouping does not drop deliveries or measurements.
+Failure reasons and success/failure outcomes remain separate labels, so 101
+event-type values does not mean only 101 total series across all instruments.
+
+The admitted names stay fixed for the telemetry object's lifetime, including
+across metric exports. A new instance starts a new budget. The default application
+creates one telemetry object for its API. Applications that construct several
+telemetry objects have a separate budget for each object.
+
+Traces, logs, and outgoing events keep the exact event type even when metrics
+use `_other`. This lets you investigate a grouped failure without accepting an
+unbounded number of metric labels. `_other` is reserved for metric grouping;
+it is not a valid incoming event type under the API's validation rules.
+
+Code that constructs `OpenTelemetryDeliveryTelemetry` can pass
+`{ maxMetricEventTypes: 50 }` as its third argument to change the budget. The
+value must be a positive safe integer; larger values allow more metric series.
+There is no environment-variable setting for this budget. It does not change
+request validation or trace sampling.
+
+If `_other` appears, inspect the exact event types in delivery logs or traces.
+Prefer stable categories such as `invoice.created`, with identifiers in the
+event data, instead of categories such as `invoice.inv_123.created`. Increasing
+the budget should follow an intentional event taxonomy, not an ever-growing
+list of identifiers. Tests cover overflow counts, duration observations,
+overlapping active deliveries, failure reasons, and trace/log correlation.
+
 The duration histogram includes bucket boundaries at 2, 3, 30, and 60 seconds,
 alongside finer buckets for fast deliveries. These make it easier to see latency
 near the default three-second timeout and the maximum supported timeout. Bucket
