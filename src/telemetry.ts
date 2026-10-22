@@ -25,11 +25,18 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
   private readonly failures: Counter;
   private readonly active: UpDownCounter;
   private readonly duration: Histogram;
+  private readonly metricEventTypes = new Set<string>();
+  private readonly maxMetricEventTypes: number;
 
   constructor(
     private readonly tracer: Tracer = trace.getTracer(instrumentationName, serviceVersion),
     meter: Meter = metrics.getMeter(instrumentationName, serviceVersion),
+    options: { maxMetricEventTypes?: number } = {},
   ) {
+    this.maxMetricEventTypes = options.maxMetricEventTypes ?? 100;
+    if (!Number.isSafeInteger(this.maxMetricEventTypes) || this.maxMetricEventTypes < 1) {
+      throw new RangeError("Expected maxMetricEventTypes to be a positive safe integer");
+    }
     this.attempts = meter.createCounter("webhook.delivery.attempts", {
       description: "Number of webhook delivery attempts",
       unit: "{attempt}",
@@ -54,6 +61,13 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
     });
   }
 
+  private metricEventType(eventType: string): string {
+    if (this.metricEventTypes.has(eventType)) return eventType;
+    if (this.metricEventTypes.size >= this.maxMetricEventTypes) return "_other";
+    this.metricEventTypes.add(eventType);
+    return eventType;
+  }
+
   async trackDelivery<T>(
     eventType: string,
     operation: () => Promise<T>,
@@ -62,8 +76,12 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
       "webhook.event.type": eventType,
       "webhook.delivery.system": "http",
     };
+    const metricAttributes: Attributes = {
+      ...attributes,
+      "webhook.event.type": this.metricEventType(eventType),
+    };
 
-    this.attempts.add(1, attributes);
+    this.attempts.add(1, metricAttributes);
 
     return this.tracer.startActiveSpan(
       "webhook.deliver",
@@ -71,7 +89,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
       async (span) => {
         const startedAt = performance.now();
         let result = "success";
-        this.active.add(1, attributes);
+        this.active.add(1, metricAttributes);
 
         try {
           return await operation();
@@ -83,7 +101,7 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
             span.setAttribute("http.response.status_code", error.statusCode);
           }
           this.failures.add(1, {
-            ...attributes,
+            ...metricAttributes,
             "webhook.delivery.failure_reason": failureReason,
           });
           span.setStatus({
@@ -97,10 +115,10 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
 
           throw error;
         } finally {
-          this.active.add(-1, attributes);
+          this.active.add(-1, metricAttributes);
           span.setAttribute("webhook.delivery.result", result);
           this.duration.record(performance.now() - startedAt, {
-            ...attributes,
+            ...metricAttributes,
             "webhook.delivery.result": result,
           });
           span.end();
