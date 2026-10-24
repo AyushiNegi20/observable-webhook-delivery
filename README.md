@@ -301,6 +301,40 @@ the request. Missing or invalid trace headers start a new trace. With the defaul
 parent-based sampler, an unsampled caller's context still propagates and appears
 in logs, but its spans are not exported.
 
+### Propagation privacy
+
+Trace context connects the steps of a delivery. Baggage is different: it carries
+arbitrary key-value metadata between services. For example, a caller might send
+`baggage: customer.marker=synthetic-customer`. This application does not need that
+metadata to deliver an event. Automatically forwarding it could disclose caller
+information to a webhook receiver. See OpenTelemetry's
+[baggage security considerations](https://opentelemetry.io/docs/concepts/signals/baggage/#baggage-security-considerations).
+
+The application SDK explicitly uses the W3C trace-context propagator. It reads
+and writes `traceparent` and valid `tracestate`, but does not extract incoming
+`baggage` into OpenTelemetry context or inject baggage into outgoing requests.
+Baggage created by application code also stays out of automatically propagated
+HTTP headers. Trace relationships and the caller's sampling decision still work.
+
+This is a code-level policy. `OTEL_PROPAGATORS` does not override it, including
+values such as `tracecontext,baggage`, `baggage`, or `none`. Other propagation
+formats are not enabled by an environment setting. Code that starts a different
+SDK instead of this application's startup module owns its propagation policy.
+
+This is not a general header scrubber: the original incoming header remains
+available on the HTTP request, and manually copying it would bypass this policy.
+Do not put secrets in `tracestate`, payloads, URLs, or other headers either.
+Trace context is not authentication, and disabling baggage does not authenticate
+the caller or receiver.
+
+The HTTP propagation tests send synthetic baggage through the real application
+SDK. They check that it reaches the API but not the receiver, is absent from
+captured spans and logs, and does not break successful, failed, or unsampled
+deliveries. A separate case sets baggage inside the delivery operation and
+checks that it is not injected into the receiver request.
+
+### Delivery metric instruments
+
 The custom metrics are:
 
 | Metric | Instrument | Purpose |
