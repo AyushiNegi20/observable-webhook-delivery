@@ -1,6 +1,7 @@
 import { IncomingMessage } from "node:http";
 import { Socket } from "node:net";
 
+import { defaultTextMapGetter, defaultTextMapSetter, propagation, ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import type { HttpInstrumentationConfig } from "@opentelemetry/instrumentation-http";
 import type { NodeSDKConfiguration } from "@opentelemetry/sdk-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,10 +50,48 @@ beforeEach(() => {
   vi.stubEnv("OTEL_METRIC_EXPORT_INTERVAL_MS", undefined);
   vi.stubEnv("OTEL_SERVICE_NAME", undefined);
   vi.stubEnv("OTEL_TRACE_HEALTHCHECKS", undefined);
+  vi.stubEnv("OTEL_PROPAGATORS", undefined);
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+describe("trace-only propagation", () => {
+  it.each([undefined, "tracecontext,baggage", "baggage", "none"])(
+    "keeps the explicit propagation policy with OTEL_PROPAGATORS=%s",
+    async (value) => {
+      vi.stubEnv("OTEL_PROPAGATORS", value);
+      const { shutdownTelemetry } = await import("../src/instrumentation.js");
+      const propagator = sdk.configure.mock.calls[0]?.[0].textMapPropagator;
+      if (!propagator) throw new Error("SDK must configure a trace-only propagator");
+
+      const traceparent = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01";
+      const tracestate = "vendor=synthetic";
+      const extracted = propagator.extract(ROOT_CONTEXT, {
+        traceparent,
+        tracestate,
+        baggage: "customer.marker=synthetic-incoming-only",
+      }, defaultTextMapGetter);
+      expect(propagator.fields()).toEqual(["traceparent", "tracestate"]);
+      expect(trace.getSpanContext(extracted)).toMatchObject({
+        traceId: "0123456789abcdef0123456789abcdef",
+        spanId: "0123456789abcdef",
+        traceFlags: 1,
+        isRemote: true,
+      });
+      expect(propagation.getBaggage(extracted)).toBeUndefined();
+
+      const withLocalBaggage = propagation.setBaggage(extracted, propagation.createBaggage({
+        "internal.marker": { value: "synthetic-local-only" },
+      }));
+      const carrier: Record<string, string> = {};
+      propagator.inject(withLocalBaggage, carrier, defaultTextMapSetter);
+      expect(carrier).toEqual({ traceparent, tracestate });
+      await shutdownTelemetry();
+    },
+    15_000,
+  );
 });
 
 describe("health probe tracing", () => {

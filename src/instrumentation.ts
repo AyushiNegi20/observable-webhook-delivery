@@ -2,6 +2,7 @@ import "./environment.js";
 
 import { randomUUID } from "node:crypto";
 
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { resourceFromAttributes } from "@opentelemetry/resources";
@@ -57,6 +58,8 @@ function readMetricExportInterval(): number {
 const traceHealthChecks = readTraceHealthChecks();
 const sdk = new NodeSDK({
   serviceName: readServiceName(),
+  // Receivers need trace context, not arbitrary baggage from API callers.
+  textMapPropagator: new W3CTraceContextPropagator(),
   resource: resourceFromAttributes({
     [ATTR_SERVICE_INSTANCE_ID]: randomUUID(),
     [ATTR_SERVICE_VERSION]: serviceVersion,
