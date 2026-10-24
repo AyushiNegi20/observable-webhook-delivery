@@ -19,30 +19,41 @@ const fixture = fileURLToPath(new URL("./fixtures/http-trace-scenario.ts", impor
 const remoteTraceId = "0123456789abcdef0123456789abcdef";
 const remoteSpanId = "0123456789abcdef";
 const traceState = "vendor=synthetic";
+const baggageHeader = "customer.marker=synthetic-incoming-only,tenant=synthetic-tenant";
 
 describe("HTTP trace propagation with the application SDK", () => {
   it.each([
     {
       name: "a sampled delivery", receiverStatus: 200,
       header: `00-${remoteTraceId}-${remoteSpanId}-01`, sampled: true, remote: true,
+      propagators: undefined,
     },
     {
       name: "a receiver failure", receiverStatus: 503,
       header: `00-${remoteTraceId}-${remoteSpanId}-01`, sampled: true, remote: true,
+      propagators: "tracecontext,baggage",
     },
     {
       name: "a missing trace header", receiverStatus: 200,
       header: undefined, sampled: true, remote: false,
+      propagators: "tracecontext,baggage",
     },
     {
       name: "an invalid trace header", receiverStatus: 200,
       header: "not-a-traceparent", sampled: true, remote: false,
+      propagators: "tracecontext,baggage",
     },
     {
       name: "an unsampled delivery", receiverStatus: 200,
       header: `00-${remoteTraceId}-${remoteSpanId}-00`, sampled: false, remote: true,
+      propagators: "tracecontext,baggage",
     },
-  ])("keeps context across both HTTP hops for $name", async ({ receiverStatus, header, sampled, remote }) => {
+    {
+      name: "locally created baggage", receiverStatus: 200,
+      header: `00-${remoteTraceId}-${remoteSpanId}-01`, sampled: true, remote: true,
+      propagators: "tracecontext,baggage", localBaggage: true,
+    },
+  ])("keeps context across both HTTP hops for $name", async ({ receiverStatus, header, sampled, remote, propagators, localBaggage }) => {
     const directory = await mkdtemp(join(tmpdir(), "webhook-trace-test-"));
     const environment = { ...process.env };
     for (const key of Object.keys(environment)) {
@@ -53,7 +64,7 @@ describe("HTTP trace propagation with the application SDK", () => {
     try {
       const { stdout } = await runNode(process.execPath, [
         "--import", loaderUrl, fixture,
-        JSON.stringify({ receiverStatus, traceparent: header, tracestate: traceState }),
+        JSON.stringify({ receiverStatus, traceparent: header, tracestate: traceState, baggage: baggageHeader, localBaggage }),
       ], {
         cwd: directory,
         env: {
@@ -61,7 +72,7 @@ describe("HTTP trace propagation with the application SDK", () => {
           OTEL_SERVICE_NAME: "propagation-test",
           OTEL_METRIC_EXPORT_INTERVAL_MS: "60000",
           OTEL_TRACES_SAMPLER: "parentbased_always_on",
-          OTEL_PROPAGATORS: "tracecontext,baggage",
+          ...(propagators === undefined ? {} : { OTEL_PROPAGATORS: propagators }),
         },
         timeout: 30_000,
       });
@@ -77,6 +88,14 @@ describe("HTTP trace propagation with the application SDK", () => {
     expect(result.requests).toHaveLength(2);
     const incoming = result.requests.find((request) => request.path === "/events");
     const receiver = result.requests.find((request) => request.path === "/mock/webhooks");
+    expect(incoming?.baggage).toBe(baggageHeader);
+    expect(receiver?.baggage).toBeUndefined();
+    expect(incoming?.baggageEntries).toEqual([]);
+    expect(receiver?.baggageEntries).toEqual([]);
+    const exportedTelemetry = JSON.stringify({ spans: result.spans, logs: result.logs, requestLogs: result.requestLogs });
+    for (const marker of ["synthetic-incoming-only", "synthetic-tenant", "synthetic-local-only"]) {
+      expect(exportedTelemetry).not.toContain(marker);
+    }
     expect(incoming?.traceparent).toBe(header);
     expect(incoming?.traceId).toMatch(/^[0-9a-f]{32}$/);
     expect(incoming?.traceId).not.toBe("0".repeat(32));

@@ -1,11 +1,14 @@
 import { createConnection } from "node:net";
 
+import { context, propagation } from "@opentelemetry/api";
 import { ConsoleSpanExporter, InMemorySpanExporter } from "@opentelemetry/sdk-trace-node";
 
 interface Scenario {
   receiverStatus: number;
   traceparent?: string;
   tracestate?: string;
+  baggage?: string;
+  localBaggage?: boolean;
   healthProbes?: boolean;
 }
 
@@ -16,6 +19,8 @@ interface ObservedRequest {
   spanId?: string;
   traceparent: string | undefined;
   tracestate: string | undefined;
+  baggage: string | undefined;
+  baggageEntries: [string, { value: string }][];
 }
 
 async function sendRequest(
@@ -37,6 +42,7 @@ async function sendRequest(
   ];
   if (scenario.traceparent !== undefined) headers.push(`traceparent: ${scenario.traceparent}`);
   if (scenario.tracestate !== undefined) headers.push(`tracestate: ${scenario.tracestate}`);
+  if (scenario.baggage !== undefined) headers.push(`baggage: ${scenario.baggage}`);
 
   // Raw TCP keeps client-side auto-instrumentation from replacing the test headers.
   return new Promise<number>((resolve, reject) => {
@@ -73,7 +79,15 @@ async function runScenario(scenario: Scenario) {
     mockReceiverStatusCode: scenario.receiverStatus,
     deliveryClient: {
       async deliver(event) {
-        await new HttpDeliveryClient(receiverUrl, 5000).deliver(event);
+        const client = new HttpDeliveryClient(receiverUrl, 5000);
+        if (scenario.localBaggage) {
+          const localContext = propagation.setBaggage(context.active(), propagation.createBaggage({
+            "internal.marker": { value: "synthetic-local-only" },
+          }));
+          await context.with(localContext, () => client.deliver(event));
+        } else {
+          await client.deliver(event);
+        }
       },
     },
   });
@@ -84,6 +98,8 @@ async function runScenario(scenario: Scenario) {
       ...activeTraceFields(),
       traceparent: typeof request.headers.traceparent === "string" ? request.headers.traceparent : undefined,
       tracestate: typeof request.headers.tracestate === "string" ? request.headers.tracestate : undefined,
+      baggage: typeof request.headers.baggage === "string" ? request.headers.baggage : undefined,
+      baggageEntries: propagation.getBaggage(context.active())?.getAllEntries() ?? [],
     });
   });
 
