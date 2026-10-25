@@ -6,7 +6,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import type { FastifyInstance } from "fastify";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import { DeliveryError } from "../src/delivery.js";
@@ -85,6 +85,7 @@ describe("delivery log correlation", () => {
       expect(span.name).toBe("webhook.deliver");
       expect(span.status.code).toBe(failed ? SpanStatusCode.ERROR : SpanStatusCode.UNSET);
       expect(span.attributes["webhook.delivery.result"]).toBe(outcome);
+      expect(span.attributes["webhook.event.id"]).toBe(body.eventId);
 
       const deliveryLogs = captured.records.filter((record) => record.eventId === body.eventId);
       expect(deliveryLogs.map((record) => record.msg)).toEqual([
@@ -120,6 +121,61 @@ describe("delivery log correlation", () => {
     },
     15_000,
   );
+
+  it("keeps event IDs separate across overlapping successful and failed requests", async () => {
+    let releaseDeliveries!: () => void;
+    const barrier = new Promise<void>((resolve) => { releaseDeliveries = resolve; });
+    const deliveredIds: string[] = [];
+    app = buildApp({
+      logger: captured.logger,
+      telemetry: new OpenTelemetryDeliveryTelemetry(provider.getTracer("log-test")),
+      deliveryClient: {
+        async deliver(event) {
+          deliveredIds.push(event.id);
+          await barrier;
+          if (event.data.fail === true) {
+            throw new DeliveryError("Synthetic receiver failure", { reason: "http_status", statusCode: 503 });
+          }
+        },
+      },
+    });
+    const server = app;
+    const requests = [false, true].map(async (fail) => server.inject({
+      method: "POST", url: "/events",
+      payload: { eventType: "invoice.created", data: { fail } },
+    }));
+
+    try {
+      await vi.waitFor(() => expect(deliveredIds).toHaveLength(2), { timeout: 5000 });
+      expect(new Set(deliveredIds).size).toBe(2);
+      expect(exporter.getFinishedSpans()).toHaveLength(0);
+      releaseDeliveries();
+      const responses = await Promise.all(requests);
+      expect(responses.map((response) => response.statusCode)).toEqual([201, 502]);
+      await provider.forceFlush();
+      const spans = exporter.getFinishedSpans();
+      expect(spans).toHaveLength(2);
+      expect(new Set(spans.map((span) => span.spanContext().traceId)).size).toBe(2);
+      for (const response of responses) {
+        const eventId = response.json<{ eventId: string }>().eventId;
+        expect(deliveredIds).toContain(eventId);
+        const span = spans.find((entry) => entry.attributes["webhook.event.id"] === eventId);
+        expect(span).toBeDefined();
+        expect(span?.attributes["webhook.delivery.result"]).toBe(response.statusCode === 201 ? "success" : "failure");
+        const logs = captured.records.filter((record) => record.eventId === eventId);
+        expect(logs).toHaveLength(2);
+        for (const log of logs) {
+          expect(log).toMatchObject({
+            eventId, eventType: "invoice.created", reqId: response.headers["x-request-id"],
+            traceId: span?.spanContext().traceId, spanId: span?.spanContext().spanId,
+          });
+        }
+      }
+    } finally {
+      releaseDeliveries();
+      await Promise.allSettled(requests);
+    }
+  }, 15_000);
 
   it.each([
     {
@@ -185,6 +241,7 @@ describe("delivery log correlation", () => {
     });
     expect(failure).toHaveProperty("err");
     expect(failure?.failureReason).toBe(spans[0]?.attributes["webhook.delivery.failure_reason"]);
+    expect(spans[0]?.attributes["webhook.event.id"]).toBe(response.json<{ eventId: string }>().eventId);
     if (statusCode === undefined) expect(failure).not.toHaveProperty("statusCode");
     else expect(failure?.statusCode).toBe(statusCode);
     expect(response.statusCode).toBe(502);

@@ -110,7 +110,9 @@ describe("HTTP trace propagation with the application SDK", () => {
     ]);
     expect(receiver?.tracestate).toBe(remote ? traceState : undefined);
     expect(result.logs).toHaveLength(3);
+    expect(receiver?.eventIdHeader).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     for (const log of result.logs) {
+      expect(log.eventId).toBe(receiver?.eventIdHeader);
       expect(log.traceId).toBe(incoming?.traceId);
       expect(log.spanId).toMatch(/^[0-9a-f]{16}$/);
     }
@@ -138,6 +140,7 @@ describe("HTTP trace propagation with the application SDK", () => {
     expect(deliverySpan?.spanId).toBe(deliveryLogs[0]?.spanId);
     expect(deliverySpan?.scope).toMatchObject({ name: "observable-webhook-delivery", version: serviceVersion });
     expect(deliverySpan?.attributes["webhook.delivery.result"]).toBe(receiverStatus === 200 ? "success" : "failure");
+    expect(deliverySpan?.attributes["webhook.event.id"]).toBe(receiver?.eventIdHeader);
     expect(clientSpan?.kind).toBe(SpanKind.CLIENT);
     expect(clientSpan?.parentSpanId).toBe(deliverySpan?.spanId);
     expect(receiverSpan?.kind).toBe(SpanKind.SERVER);

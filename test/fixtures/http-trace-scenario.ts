@@ -21,6 +21,7 @@ interface ObservedRequest {
   tracestate: string | undefined;
   baggage: string | undefined;
   baggageEntries: [string, { value: string }][];
+  eventIdHeader: string | undefined;
 }
 
 async function sendRequest(
@@ -100,6 +101,7 @@ async function runScenario(scenario: Scenario) {
       tracestate: typeof request.headers.tracestate === "string" ? request.headers.tracestate : undefined,
       baggage: typeof request.headers.baggage === "string" ? request.headers.baggage : undefined,
       baggageEntries: propagation.getBaggage(context.active())?.getAllEntries() ?? [],
+      eventIdHeader: typeof request.headers["x-webhook-id"] === "string" ? request.headers["x-webhook-id"] : undefined,
     });
   });
 

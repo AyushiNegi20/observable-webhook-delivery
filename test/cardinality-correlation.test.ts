@@ -66,6 +66,7 @@ it("groups metric labels without changing event types in API delivery, traces, o
       await tracerProvider.forceFlush();
       const span = exporter.getFinishedSpans().at(-1);
       expect(span?.attributes["webhook.event.type"]).toBe(eventType);
+      expect(span?.attributes["webhook.event.id"]).toBe(eventId);
       expect(span?.attributes["webhook.delivery.result"]).toBe(status === 201 ? "success" : "failure");
       const logs = captured.records.filter((record) => record.eventId === eventId);
       expect(logs).toHaveLength(2);
@@ -107,6 +108,7 @@ it("groups metric labels without changing event types in API delivery, traces, o
     for (const metric of metrics) {
       for (const point of metric.dataPoints) {
         expect(["invoice.created", "_other"]).toContain(point.attributes["webhook.event.type"]);
+        expect(point.attributes).not.toHaveProperty(["webhook.event.id"]);
       }
     }
   } finally {
