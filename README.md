@@ -255,6 +255,47 @@ POST /events (HTTP server)
       POST /mock/webhooks (HTTP server)
 ```
 
+### Find a delivery by event ID
+
+The API generates one event UUID before each delivery attempt. Its value appears
+as `eventId` in both successful and failed delivery responses, as `id` in the
+outgoing event, and in the `x-webhook-id` receiver header. The custom
+`webhook.deliver` span now records that same value as `webhook.event.id`.
+Delivery and mock receiver logs use `eventId`.
+
+These identifiers answer different questions:
+
+| Identifier | What it identifies | Where to find it |
+|---|---|---|
+| Event ID | The event being delivered | API response, receiver header and body, custom span, delivery logs |
+| Request ID | One incoming HTTP request | `x-request-id` response header and `reqId` in logs |
+| Trace ID | Related operations across the delivery flow | Span context and `traceId` in delivery logs |
+| Span ID | One operation within a trace | Span context and `spanId` in delivery logs |
+
+To investigate an event with the current console exporters:
+
+1. Copy `eventId` from the `201` or `502` response to `POST /events`.
+2. Find a `webhook.deliver` span whose `webhook.event.id` matches it. Check
+   `webhook.delivery.result`, duration, and any failure reason or receiver status.
+3. Match the event's logs using `eventId`. Their trace and span IDs connect the
+   log records to the delivery span and the surrounding HTTP operations.
+
+Wait for the exporter to flush before searching. An unsampled delivery has no
+exported span, but its event ID and valid trace IDs remain in delivery logs.
+Validation failures happen before an event is created, so use their request ID
+instead. This is correlation metadata, not durable event storage or a lookup API.
+
+Event IDs are not metric labels. Two events with the same type still contribute
+to the same attempt series, and the event-type budget continues to apply.
+Identifiers also do not belong in span names or resource attributes. Payload
+fields are not copied into the delivery span.
+
+Code using `OpenTelemetryDeliveryTelemetry` directly can supply
+`{ eventId: event.id }` as the optional third argument to `trackDelivery`.
+The existing two-argument form still works and omits `webhook.event.id`; it does
+not generate a new ID. Pass the event's existing ID, not customer details or
+credentials. The HTTP API supplies its server-generated UUID automatically.
+
 ### Health-check tracing
 
 Routine `GET` and `HEAD` requests to `/health` do not create incoming HTTP spans
