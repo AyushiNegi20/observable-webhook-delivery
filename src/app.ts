@@ -180,7 +180,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
             },
             "Webhook delivery completed",
           );
-        });
+        }, { eventId: event.id });
       } catch {
         return reply.code(502).send({
           eventId: event.id,

@@ -16,8 +16,16 @@ import { serviceVersion } from "./service-metadata.js";
 
 const instrumentationName = "observable-webhook-delivery";
 
+export interface DeliveryTraceDetails {
+  eventId: string;
+}
+
 export interface DeliveryTelemetry {
-  trackDelivery<T>(eventType: string, operation: () => Promise<T>): Promise<T>;
+  trackDelivery<T>(
+    eventType: string,
+    operation: () => Promise<T>,
+    details?: DeliveryTraceDetails,
+  ): Promise<T>;
 }
 
 export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
@@ -71,14 +79,17 @@ export class OpenTelemetryDeliveryTelemetry implements DeliveryTelemetry {
   async trackDelivery<T>(
     eventType: string,
     operation: () => Promise<T>,
+    details?: DeliveryTraceDetails,
   ): Promise<T> {
     const attributes: Attributes = {
       "webhook.event.type": eventType,
       "webhook.delivery.system": "http",
+      ...(details === undefined ? {} : { "webhook.event.id": details.eventId }),
     };
+    // Metric labels must not inherit identifiers from span attributes.
     const metricAttributes: Attributes = {
-      ...attributes,
       "webhook.event.type": this.metricEventType(eventType),
+      "webhook.delivery.system": "http",
     };
 
     this.attempts.add(1, metricAttributes);
