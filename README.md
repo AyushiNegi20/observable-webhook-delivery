@@ -227,6 +227,49 @@ or those log records available for investigation.
 
 OpenTelemetry starts before the application so it can instrument incoming HTTP requests and outgoing calls made with `fetch`. Traces and metrics are exported to the console during this learning milestone.
 
+### One-command incident demos
+
+After `pnpm install`, run a complete local scenario without starting `pnpm dev`
+or preparing a separate receiver:
+
+```bash
+pnpm demo
+pnpm demo rejected
+pnpm demo timeout
+```
+
+`pnpm demo success` is equivalent to `pnpm demo`. Each command starts a temporary
+API and mock receiver, sends one synthetic `invoice.created` event, closes the
+server, and flushes telemetry before exiting. It binds only to `127.0.0.1` on an
+OS-assigned port, so an existing development server can keep running.
+
+| Scenario | Receiver behavior | API result | Delivery span |
+|---|---|---|---|
+| `success` | Responds with `200` | `201`, delivered | Successful delivery |
+| `rejected` | Responds with `503` | `502`, failed | `failure_reason=http_status` |
+| `timeout` | Waits 1500 ms before responding | `502`, failed after the 1000 ms delivery deadline | `failure_reason=timeout` |
+
+The `DEMO_RESULT=` line includes the scenario, API status, event ID, and delivery
+status. Find that event ID in the delivery logs and the custom span's
+`webhook.event.id`. Compare the attempt counter, failure counter, and duration
+histogram across the scenarios. Each run is a new process, so its counters start
+fresh and its service instance ID changes unless explicitly overridden.
+
+With normal sampling, this demo produces five spans: its own HTTP client request
+plus the four-span delivery flow shown below. In the timeout scenario, the
+receiver can still log an accepted webhook after the API reports failure. The
+command waits for that receiver work before flushing telemetry. It does not
+retry the event. An expected rejection or timeout exits with code `0` because
+the demonstration ran as intended; invalid arguments or unexpected failures
+exit with code `1`.
+
+Demo traffic always stays local. `HOST`, `PORT`, `DELIVERY_TARGET_URL`, delivery
+timeout, and mock receiver environment settings do not change the scenarios.
+`LOG_LEVEL` and the application's OpenTelemetry settings still apply, including
+values loaded from `.env`. Use `LOG_LEVEL=info` and normal sampling when you want
+to see all three signals. The script uses the development dependency `tsx` and
+is not included in the production Docker image.
+
 Custom delivery spans and metrics use the `observable-webhook-delivery`
 instrumentation scope with the application version from `package.json`. The
 resource's `service.version` identifies the running application; the scope
@@ -582,6 +625,7 @@ waits for that operation before exiting, including when telemetry flushing fails
 
 ```bash
 pnpm dev
+pnpm demo
 pnpm build
 pnpm test
 pnpm lint
