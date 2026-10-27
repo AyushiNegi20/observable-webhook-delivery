@@ -11,6 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch --import ./src/instrumentation.ts src/server.ts",
+    "demo": "tsx --import ./src/instrumentation.ts scripts/demo.ts",
     "lint": "eslint .",
     "start": "node --import ./dist/instrumentation.js dist/server.js",
     "test": "vitest run",
