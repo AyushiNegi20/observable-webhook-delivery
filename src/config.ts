@@ -1,12 +1,24 @@
 import { isIP } from "node:net";
 
+import type { LogLevel } from "fastify";
+
 export interface AppConfig {
   deliveryTargetUrl: string;
   deliveryTimeoutMs: number;
   host: string;
+  logLevel: LogLevel;
   mockReceiverDelayMs: number;
   mockReceiverStatusCode: number;
   port: number;
+}
+
+function readLogLevel(value: string | undefined): LogLevel {
+  const levels: readonly LogLevel[] = ["trace", "debug", "info", "warn", "error", "fatal", "silent"];
+  const level = levels.find((candidate) => candidate === (value ?? "info").trim());
+  if (level === undefined) {
+    throw new Error("Expected LOG_LEVEL to be trace, debug, info, warn, error, fatal, or silent");
+  }
+  return level;
 }
 
 function readPositiveInteger(value: string | undefined, fallback: number): number {
@@ -124,6 +136,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   return {
     host,
     port,
+    logLevel: readLogLevel(environment.LOG_LEVEL),
     deliveryTargetUrl: readHttpUrl(deliveryTargetUrl),
     deliveryTimeoutMs: readDeliveryTimeout(environment.DELIVERY_TIMEOUT_MS),
     mockReceiverDelayMs: readMockReceiverDelay(environment.MOCK_RECEIVER_DELAY_MS),

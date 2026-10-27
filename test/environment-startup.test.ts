@@ -18,11 +18,12 @@ const configUrl = new URL("../src/config.ts", import.meta.url).href;
 const outputPrefix = "STARTUP_CONFIG=";
 const appVariables = [
   "HOST", "PORT", "DELIVERY_TARGET_URL", "DELIVERY_TIMEOUT_MS", "MOCK_RECEIVER_STATUS_CODE",
-  "MOCK_RECEIVER_DELAY_MS",
+  "MOCK_RECEIVER_DELAY_MS", "LOG_LEVEL",
 ];
 const localSettings = [
   'HOST=" 127.0.0.1 "',
   "PORT=3100",
+  "LOG_LEVEL=warn",
   "DELIVERY_TIMEOUT_MS=1250",
   "MOCK_RECEIVER_STATUS_CODE=503",
   "MOCK_RECEIVER_DELAY_MS=250",
@@ -83,6 +84,7 @@ describe("environment settings in a fresh process", () => {
       config: {
         host: "0.0.0.0",
         port: 3000,
+        logLevel: "info",
         deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
         deliveryTimeoutMs: 3000,
         mockReceiverStatusCode: 200,
@@ -98,6 +100,7 @@ describe("environment settings in a fresh process", () => {
       config: {
         host: "127.0.0.1",
         port: 3100,
+        logLevel: "warn",
         deliveryTargetUrl: "http://127.0.0.1:3100/mock/webhooks",
         deliveryTimeoutMs: 1250,
         mockReceiverStatusCode: 503,
@@ -111,10 +114,11 @@ describe("environment settings in a fresh process", () => {
   it("keeps process variables ahead of file values", async () => {
     await writeFile(join(directory, ".env"), localSettings);
 
-    expect(await readStartup({ PORT: "3200", OTEL_SERVICE_NAME: "process-test-api" })).toMatchObject({
+    expect(await readStartup({ PORT: "3200", LOG_LEVEL: "error", OTEL_SERVICE_NAME: "process-test-api" })).toMatchObject({
       config: {
         host: "127.0.0.1",
         port: 3200,
+        logLevel: "error",
         deliveryTargetUrl: "http://127.0.0.1:3200/mock/webhooks",
       },
       serviceName: "process-test-api",
@@ -157,5 +161,10 @@ describe("environment settings in a fresh process", () => {
     await expect(readStartup({ HOST: "" })).rejects.toThrow(
       "Expected HOST to be a non-empty value",
     );
+  }, 40_000);
+
+  it("rejects a blank process log level even when the file has a valid level", async () => {
+    await writeFile(join(directory, ".env"), localSettings);
+    await expect(readStartup({ LOG_LEVEL: "" })).rejects.toThrow("Expected LOG_LEVEL to be");
   }, 40_000);
 });

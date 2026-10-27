@@ -11,13 +11,14 @@ const server = vi.hoisted(() => ({
   log: { info: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("../src/app.js", () => ({ buildApp: () => { server.build(); return server; } }));
+vi.mock("../src/app.js", () => ({ buildApp: (options: unknown) => { server.build(options); return server; } }));
 vi.mock("../src/config.js", () => ({
   loadConfig: () => {
     server.configure();
     return {
       host: "127.0.0.1",
       port: 3000,
+      logLevel: "warn",
       deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
       deliveryTimeoutMs: 3000,
       mockReceiverStatusCode: 200,
@@ -133,6 +134,7 @@ describe("server startup cleanup", () => {
   it("leaves resources running after a successful listen", async () => {
     await import("../src/server.js");
 
+    expect(server.build).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ logLevel: "warn" }));
     expect(server.listen).toHaveBeenCalledExactlyOnceWith({ host: "127.0.0.1", port: 3000 });
     expect(server.close).not.toHaveBeenCalled();
     expect(server.flush).not.toHaveBeenCalled();

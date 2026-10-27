@@ -7,12 +7,29 @@ describe("application configuration", () => {
     expect(loadConfig({})).toEqual({
       host: "0.0.0.0",
       port: 3000,
+      logLevel: "info",
       deliveryTargetUrl: "http://127.0.0.1:3000/mock/webhooks",
       deliveryTimeoutMs: 3000,
       mockReceiverStatusCode: 200,
       mockReceiverDelayMs: 0,
     });
   });
+
+  it.each(["trace", "debug", "info", "warn", "error", "fatal", "silent"])(
+    "loads log level %s", (level) => {
+      expect(loadConfig({ LOG_LEVEL: level }).logLevel).toBe(level);
+    },
+  );
+
+  it("trims whitespace around the log level", () => {
+    expect(loadConfig({ LOG_LEVEL: " warn " }).logLevel).toBe("warn");
+  });
+
+  it.each(["", " ", "INFO", "warning", "verbose", "30"])(
+    "rejects invalid log level %j", (level) => {
+      expect(() => loadConfig({ LOG_LEVEL: level })).toThrow("Expected LOG_LEVEL to be");
+    },
+  );
 
   it("rejects an invalid timeout", () => {
     expect(() => loadConfig({ DELIVERY_TIMEOUT_MS: "zero" })).toThrow(

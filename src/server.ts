@@ -48,6 +48,7 @@ try {
   );
   app = buildApp({
     deliveryClient,
+    logLevel: config.logLevel,
     mockReceiverDelayMs: config.mockReceiverDelayMs,
     mockReceiverStatusCode: config.mockReceiverStatusCode,
   });

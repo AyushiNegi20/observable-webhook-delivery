@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+import Fastify, { type FastifyBaseLogger, type FastifyInstance, type LogLevel } from "fastify";
 
 import {
   DeliveryError,
@@ -22,6 +22,7 @@ interface EventRequestBody {
 interface BuildAppOptions {
   deliveryClient: DeliveryClient;
   logger?: boolean | FastifyBaseLogger;
+  logLevel?: LogLevel;
   mockReceiverDelayMs?: number;
   mockReceiverStatusCode?: number;
   telemetry?: DeliveryTelemetry;
@@ -71,8 +72,12 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     genReqId: () => randomUUID(),
     requestIdHeader: false,
     ...(typeof options.logger === "object"
-      ? { loggerInstance: options.logger }
-      : { logger: options.logger ?? true }),
+      ? {
+        loggerInstance: options.logLevel === undefined
+          ? options.logger
+          : options.logger.child({}, { level: options.logLevel }),
+      }
+      : { logger: options.logger === false ? false : { level: options.logLevel ?? "info" } }),
   });
   const deliveryTelemetry =
     options.telemetry ?? new OpenTelemetryDeliveryTelemetry();
