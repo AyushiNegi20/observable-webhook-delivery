@@ -15,7 +15,7 @@ const loaderUrl = pathToFileURL(require.resolve("tsx")).href;
 const fixture = fileURLToPath(new URL("./fixtures/failed-startup.ts", import.meta.url));
 const appVariables = [
   "HOST", "PORT", "DELIVERY_TARGET_URL", "DELIVERY_TIMEOUT_MS",
-  "MOCK_RECEIVER_STATUS_CODE", "MOCK_RECEIVER_DELAY_MS",
+  "MOCK_RECEIVER_STATUS_CODE", "MOCK_RECEIVER_DELAY_MS", "LOG_LEVEL",
 ];
 
 async function runFailedStartup(overrides: NodeJS.ProcessEnv) {
@@ -71,6 +71,7 @@ describe("failed startup with the application SDK", () => {
   it.each([
     { variable: "PORT", value: "0", message: "Expected a positive integer" },
     { variable: "HOST", value: "   ", message: "Expected HOST to be a non-empty value" },
+    { variable: "LOG_LEVEL", value: "verbose", message: "Expected LOG_LEVEL to be" },
     {
       variable: "DELIVERY_TARGET_URL", value: "ftp://example.invalid/webhooks",
       message: "Expected DELIVERY_TARGET_URL to be a valid HTTP URL",

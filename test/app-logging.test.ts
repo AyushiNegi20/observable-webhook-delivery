@@ -21,6 +21,28 @@ describe("application logging", () => {
     }
   });
 
+  it.each([undefined, true])("sets the built-in logger level when logger=%s", async (logger) => {
+    app = buildApp({
+      deliveryClient: { deliver: async () => {} },
+      ...(logger === undefined ? {} : { logger }),
+      logLevel: "error",
+    });
+    await app.ready();
+    expect(app.log.level).toBe("error");
+  }, 15_000);
+
+  it("preserves a supplied logger's level when no override is requested", async () => {
+    captured.logger.level = "error";
+    app = buildApp({ deliveryClient: { deliver: async () => {} }, logger: captured.logger });
+    await app.inject({ method: "GET", url: "/health" });
+    expect(app.log.level).toBe("error");
+    expect(captured.records).toEqual([]);
+    app.log.error("Synthetic error");
+    expect(captured.records).toEqual([expect.objectContaining({
+      level: 50, component: "logging-test", msg: "Synthetic error",
+    })]);
+  }, 15_000);
+
   it("uses a supplied logger with its bindings and request serializer", async () => {
     app = buildApp({
       deliveryClient: { deliver: async () => {} },
