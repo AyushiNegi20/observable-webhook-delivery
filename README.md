@@ -138,7 +138,7 @@ pnpm dev
 The API listens on `http://localhost:3000` by default.
 
 Copy `.env.example` to `.env` to change the host, port, delivery target, timeout,
-mock receiver status, or telemetry settings. Startup loads `.env` from the working
+log level, mock receiver status, or telemetry settings. Startup loads `.env` from the working
 directory before configuring OpenTelemetry. Variables already set in the process
 take precedence over the file. A missing `.env` is allowed; other file-reading
 errors stop startup instead of silently ignoring configuration.
@@ -189,6 +189,39 @@ request.
 Unused receiver response bodies are cancelled after the response headers arrive.
 The service does not parse or log those bodies, and cleanup failures do not change
 the delivery result determined by the HTTP status.
+
+### Application log level
+
+`LOG_LEVEL` defaults to `info`. It accepts `trace`, `debug`, `info`, `warn`,
+`error`, `fatal`, or `silent`. Values are case-sensitive, with surrounding
+whitespace ignored. Blank or unknown values stop startup instead of silently
+falling back to another level. Process environment values take precedence over
+`.env`, including an invalid or blank process value.
+
+The setting is a minimum severity, not a filter for one exact level:
+
+| Setting | Application logs retained |
+|---|---|
+| `trace` or `debug` | Messages at that severity and above |
+| `info` | Routine requests, successful deliveries, warnings, and errors |
+| `warn` | Mock receiver rejections, errors, and any fatal messages |
+| `error` | Errors and any fatal messages |
+| `fatal` | Fatal messages only |
+| `silent` | No application JSON logs |
+
+For a quieter failure exercise, set `LOG_LEVEL=warn` and
+`MOCK_RECEIVER_STATUS_CODE=503` in `.env`, then restart the app. A submitted event
+still returns `502`. The mock receiver warning and delivery failure log remain,
+while routine request and successful-delivery messages are filtered out. Restore
+`LOG_LEVEL=info` when you want to follow successful requests again.
+
+Log filtering does not change delivery behavior, response request IDs, trace
+sampling, or metric recording. Even `silent` leaves the console span and metric
+exporters active, so it does not mean an empty terminal. Failures before the
+application logger exists still go to stderr. At `fatal` or `silent`, ordinary
+error logs are hidden; use exit codes and exported telemetry to detect failures.
+An unsampled request whose logs are filtered out will not have an exported span
+or those log records available for investigation.
 
 ## OpenTelemetry output
 
@@ -450,8 +483,12 @@ diagnostics. Successful delivery logs omit both failure fields, and the public
 API still returns its generic error response.
 
 When using `buildApp` directly, its `logger` option accepts a compatible logger
-instance as well as `true` or `false`. A supplied logger retains its bindings and
-receives both request logs and delivery logs. Omitting it enables JSON logging.
+instance as well as `true` or `false`. Omitting it enables JSON logging at `info`.
+The `logLevel` option sets the built-in logger's threshold. With a supplied
+logger, omitting `logLevel` preserves its level; an explicit override creates a
+child logger with that threshold without changing the parent. Bindings and
+serializers are retained. `logger: false` keeps logging disabled even when
+`logLevel` is supplied. Logs below the selected threshold are not retained.
 
 To simulate an unavailable destination, restart the application with:
 
