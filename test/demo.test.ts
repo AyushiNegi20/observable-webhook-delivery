@@ -110,7 +110,7 @@ describe("local demo command", () => {
   it.each([["unknown"], ["success", "extra"]])("rejects invalid arguments %j without making a delivery", async (...args) => {
     const output = await runDemo(args);
     expect(output.exitCode).toBe(1);
-    expect(output.stderr).toContain("Usage: pnpm demo [success|rejected|timeout]");
+    expect(output.stderr).toContain("Usage: pnpm demo [success|rejected|timeout|disconnected]");
     expect(output.stdout).not.toContain("DEMO_RESULT=");
     expect(readReport<DemoTelemetry>(output.stdout, "DEMO_TELEMETRY=")).toEqual({ spans: [], metrics: [] });
   }, 40_000);

@@ -11,6 +11,7 @@ const scenarios = {
   success: { receiverStatus: 200, delayMs: 0, timeoutMs: 3000, apiStatus: 201 },
   rejected: { receiverStatus: 503, delayMs: 0, timeoutMs: 3000, apiStatus: 502 },
   timeout: { receiverStatus: 200, delayMs: 1500, timeoutMs: 1000, apiStatus: 502 },
+  disconnected: { receiverStatus: 200, delayMs: 0, timeoutMs: 3000, apiStatus: 502 },
 } as const;
 
 let app: FastifyInstance | undefined;
@@ -18,8 +19,10 @@ let receiverWaitTimer: ReturnType<typeof setTimeout> | undefined;
 
 try {
   const scenario = process.argv[2] ?? "success";
-  if (process.argv.length > 3 || (scenario !== "success" && scenario !== "rejected" && scenario !== "timeout")) {
-    throw new Error("Usage: pnpm demo [success|rejected|timeout]");
+  if (process.argv.length > 3 || (
+    scenario !== "success" && scenario !== "rejected" && scenario !== "timeout" && scenario !== "disconnected"
+  )) {
+    throw new Error("Usage: pnpm demo [success|rejected|timeout|disconnected]");
   }
   const settings = scenarios[scenario];
   // Only the logging setting is reused. Demo traffic must stay on loopback.
@@ -35,6 +38,14 @@ try {
         await new HttpDeliveryClient(receiverUrl, settings.timeoutMs).deliver(event);
       },
     },
+  });
+  app.addHook("onRequest", async (request, reply) => {
+    if (scenario === "disconnected" && request.url === "/mock/webhooks") {
+      // Close the connection before the receiver handler can send an HTTP response.
+      reply.hijack();
+      reply.raw.destroy();
+      receiverFinished();
+    }
   });
   app.addHook("onSend", async (request) => {
     if (request.url === "/mock/webhooks") receiverFinished();
