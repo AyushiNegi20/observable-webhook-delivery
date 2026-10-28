@@ -236,6 +236,7 @@ or preparing a separate receiver:
 pnpm demo
 pnpm demo rejected
 pnpm demo timeout
+pnpm demo disconnected
 ```
 
 `pnpm demo success` is equivalent to `pnpm demo`. Each command starts a temporary
@@ -248,6 +249,7 @@ OS-assigned port, so an existing development server can keep running.
 | `success` | Responds with `200` | `201`, delivered | Successful delivery |
 | `rejected` | Responds with `503` | `502`, failed | `failure_reason=http_status` |
 | `timeout` | Waits 1500 ms before responding | `502`, failed after the 1000 ms delivery deadline | `failure_reason=timeout` |
+| `disconnected` | Closes the connection before sending an HTTP response | `502`, failed | `failure_reason=network` |
 
 The `DEMO_RESULT=` line includes the scenario, API status, event ID, and delivery
 status. Find that event ID in the delivery logs and the custom span's
@@ -259,9 +261,9 @@ With normal sampling, this demo produces five spans: its own HTTP client request
 plus the four-span delivery flow shown below. In the timeout scenario, the
 receiver can still log an accepted webhook after the API reports failure. The
 command waits for that receiver work before flushing telemetry. It does not
-retry the event. An expected rejection or timeout exits with code `0` because
-the demonstration ran as intended; invalid arguments or unexpected failures
-exit with code `1`.
+retry the event. An expected rejection, timeout, or disconnect exits with code
+`0` because the demonstration ran as intended; invalid arguments or unexpected
+failures exit with code `1`.
 
 Demo traffic always stays local. `HOST`, `PORT`, `DELIVERY_TARGET_URL`, delivery
 timeout, and mock receiver environment settings do not change the scenarios.
@@ -275,6 +277,33 @@ instrumentation scope with the application version from `package.json`. The
 resource's `service.version` identifies the running application; the scope
 identifies the code that created those signals. Automatic HTTP instrumentation
 keeps its own library name and version.
+
+#### Investigate a lost connection
+
+Run `pnpm demo disconnected` to simulate a receiver dropping its connection. The
+demo closes the local receiver socket before its handler runs, while the API
+stays available to return the delivery failure. It uses the real HTTP delivery
+client; there is no external destination or invented HTTP error response.
+
+1. Find the event ID in `DEMO_RESULT=` and locate its `Webhook delivery failed`
+   log. The log reports `failureReason=network` and has no receiver `statusCode`.
+2. Follow the log's `traceId` to `webhook.deliver`. Its
+   `webhook.delivery.failure_reason` is `network`, and it has no
+   `http.response.status_code`. The outgoing request and interrupted incoming
+   receiver request still belong to that trace when sampling is enabled.
+3. Check the metrics: one attempt, one failure labeled `network`, one duration
+   observation, and zero active deliveries after cleanup. No mock receiver
+   acceptance or rejection log is produced because its handler never ran.
+
+Compare this with `pnpm demo rejected`: a real receiver response adds status
+`503` to the failure log and custom span, and classifies the failure as
+`http_status`. `pnpm demo timeout` instead reaches the delivery deadline and
+reports `timeout`. All three return API status `502`, so that status alone does
+not identify the cause. Logs and traces explain it; metrics count its frequency.
+
+This particular disconnect happens before the receiver handler. In a real
+incident, a connection can also be lost after the receiver has processed an
+event. A network failure alone does not prove that processing never happened.
 
 ### Service identity
 
