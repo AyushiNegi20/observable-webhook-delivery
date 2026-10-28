@@ -18,7 +18,7 @@ interface DemoOutput {
 }
 
 interface DemoTelemetry {
-  spans: { name: string; traceId: string; spanId: string; attributes: Record<string, unknown> }[];
+  spans: { name: string; traceId: string; spanId: string; parentSpanId?: string; attributes: Record<string, unknown> }[];
   metrics: { name: string; histogram: boolean; points: { attributes: Record<string, unknown>; value: number | { count: number } }[] }[];
 }
 
@@ -62,6 +62,7 @@ describe("local demo command", () => {
     { args: [], scenario: "success", statusCode: 201, failureReason: undefined },
     { args: ["rejected"], scenario: "rejected", statusCode: 502, failureReason: "http_status" },
     { args: ["timeout"], scenario: "timeout", statusCode: 502, failureReason: "timeout" },
+    { args: ["disconnected"], scenario: "disconnected", statusCode: 502, failureReason: "network" },
   ])("runs the $scenario scenario and flushes its telemetry", async ({ args, scenario, statusCode, failureReason }) => {
     const output = await runDemo(args);
     expect(output.exitCode, output.stderr).toBe(0);
@@ -77,6 +78,7 @@ describe("local demo command", () => {
       "webhook.delivery.result": statusCode === 201 ? "success" : "failure",
     });
     expect(delivery?.attributes["webhook.delivery.failure_reason"]).toBe(failureReason);
+    expect(delivery?.attributes["http.response.status_code"]).toBe(scenario === "rejected" ? 503 : undefined);
     expect(telemetry.spans).toHaveLength(5);
     expect(new Set(telemetry.spans.map((span) => span.traceId)).size).toBe(1);
     for (const span of telemetry.spans) {
@@ -91,6 +93,17 @@ describe("local demo command", () => {
       eventId: report.eventId, traceId: delivery?.traceId, spanId: delivery?.spanId,
       msg: statusCode === 201 ? "Webhook delivery completed" : "Webhook delivery failed",
     }));
+    if (scenario === "disconnected") {
+      const failure = logs.find((log) => log.msg === "Webhook delivery failed");
+      expect(failure?.failureReason).toBe("network");
+      expect(failure).not.toHaveProperty("statusCode");
+      expect(logs.some((log) => log.msg === "Mock receiver accepted webhook" || log.msg === "Mock receiver rejected webhook"))
+        .toBe(false);
+      // Even the interrupted HTTP hop keeps the API, delivery, and receiver in one trace.
+      const outgoing = telemetry.spans.find((span) => span.parentSpanId === delivery?.spanId);
+      expect(outgoing).toBeDefined();
+      expect(telemetry.spans.some((span) => span.parentSpanId === outgoing?.spanId)).toBe(true);
+    }
     if (scenario === "timeout") {
       expect(logs).toContainEqual(expect.objectContaining({
         eventId: report.eventId, msg: "Mock receiver accepted webhook", delayMs: 1500,
@@ -102,6 +115,11 @@ describe("local demo command", () => {
       expect(metric?.points.reduce((total, point) => total + Number(point.value), 0) ?? 0).toBe(value);
     }
     const duration = telemetry.metrics.find((entry) => entry.name === "webhook.delivery.duration");
+    if (failureReason !== undefined) {
+      const failures = telemetry.metrics.find((entry) => entry.name === "webhook.delivery.failures");
+      expect(failures?.points).toHaveLength(1);
+      expect(failures?.points[0]?.attributes["webhook.delivery.failure_reason"]).toBe(failureReason);
+    }
     expect(duration?.histogram).toBe(true);
     expect(duration?.points).toHaveLength(1);
     expect(duration?.points[0]?.value).toMatchObject({ count: 1 });
